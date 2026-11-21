@@ -14,8 +14,8 @@ iex -S mix
 ```elixir
 results = System.fetch_env!("WORKSPACE_RESULTS_DIR")
 store = Path.join(results, "bundles")
-Application.put_env(:jido_workspace, :stores, %{"reports" => store})
-Application.put_env(:jido_workspace, :profiles, %{
+Application.put_env(:jido_realm, :stores, %{"reports" => store})
+Application.put_env(:jido_realm, :profiles, %{
   author: %{provider: :memory, policy: :workspace_write, store: "reports"},
   reader: %{provider: :memory, policy: :read_only, store: "reports"}
 })
@@ -24,18 +24,18 @@ Application.put_env(:jido_workspace, :profiles, %{
 ## Save and hand off the reference
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
-{:ok, workspace} = Workspace.open(profile: :author)
-:ok = Workspace.mkdir(workspace, "reports")
-:ok = Workspace.mkdir(workspace, "reports/empty")
-:ok = Workspace.write(workspace, "reports/final.txt", "approved report\n")
-{:ok, saved} = Workspace.save(workspace)
+{:ok, workspace} = Host.open(profile: :author)
+:ok = Host.mkdir(workspace, "reports")
+:ok = Host.mkdir(workspace, "reports/empty")
+:ok = Host.write(workspace, "reports/final.txt", "approved report\n")
+{:ok, saved} = Host.save(workspace)
 :ok = File.write(Path.join(results, "saved.json"), Jason.encode!(saved))
 
-:ok = Workspace.write(workspace, "reports/final.txt", "later draft\n")
-:ok = Workspace.delete(workspace, "reports/empty")
-:ok = Workspace.close(workspace)
+:ok = Host.write(workspace, "reports/final.txt", "later draft\n")
+:ok = Host.delete(workspace, "reports/empty")
+:ok = Host.close(workspace)
 ```
 
 You can stop IEx after this step. To deploy from a new BEAM, keep `WORKSPACE_RESULTS_DIR` and run the configuration again. The reader profile must grant `:read` and `:import` for the saved reference's store. The deploy step reads the bundle directly and uses only the target sandbox to stage files or run checks.
@@ -43,11 +43,11 @@ You can stop IEx after this step. To deploy from a new BEAM, keep `WORKSPACE_RES
 ## Deploy to a separate target
 
 ```elixir
-alias Jido.Workspace.{Deploy, Sandbox}
-alias Jido.Workspace.Deploy.{Artifact, Snapshot}
+alias Jido.Realm.Host.{Deploy, Sandbox}
+alias Jido.Realm.Host.Deploy.{Artifact, Snapshot}
 
 reference = results |> Path.join("saved.json") |> File.read!() |> Jason.decode!()
-{:ok, saved} = Jido.Workspace.Snapshot.parse(reference)
+{:ok, saved} = Jido.Realm.Host.Snapshot.parse(reference)
 {:ok, payload} = Snapshot.from_saved(reference, profile: :reader)
 {:ok, artifact} = Artifact.new(:source, "report-1", payload)
 {:ok, sandbox} = Sandbox.open(owner: self())

@@ -14,7 +14,7 @@ configured author name and email.
 ```sh
 git_dir=$(mktemp -d)
 git init --bare --initial-branch=reviewed "$git_dir/results.git"
-git -C "$git_dir/results.git" config user.name 'Workspace Example'
+git -C "$git_dir/results.git" config user.name 'Realm Example'
 git -C "$git_dir/results.git" config user.email workspace@example.invalid
 git -C "$git_dir/results.git" config commit.gpgsign false
 empty_tree=$(git -C "$git_dir/results.git" write-tree)
@@ -32,29 +32,29 @@ must have read-only access and use the same store as the scratch profile.
 The test also uses a read-only Docker profile with that store.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
 reference = Jason.decode!(approved_reference)
-{:ok, review} = Workspace.open(profile: :review, from: reference)
+{:ok, review} = Host.open(profile: :review, from: reference)
 
 report =
   try do
-    {:ok, contents} = Workspace.read(review, "report.txt")
+    {:ok, contents} = Host.read(review, "report.txt")
     contents
   after
-    :ok = Workspace.close(review)
+    :ok = Host.close(review)
   end
 ```
 
 ## Prepare and publish a commit
 
-Run this code in IEx from the Jido Workspace repository root. Use the
+Run this code in IEx from the Jido Realm repository root. Use the
 full commit ID the host recorded for `refs/heads/reviewed` at review
 time as `expected_head`.
 
 ```elixir
 Code.require_file("examples/07_keep_useful_results/07_02_publish_a_reviewed_git_result/example.ex")
-alias Jido.Workspace.Examples.PublishReviewedGit
+alias Jido.Realm.Host.Examples.PublishReviewedGit
 
 repo = System.fetch_env!("WORKSPACE_RESULTS_GIT")
 expected_head = System.fetch_env!("WORKSPACE_RESULTS_BASE")

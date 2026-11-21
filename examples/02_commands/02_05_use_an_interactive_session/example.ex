@@ -1,7 +1,7 @@
-defmodule Jido.Workspace.Examples.AnswerPrompt do
+defmodule Jido.Realm.Host.Examples.AnswerPrompt do
   @moduledoc "Send a line of input to a program in a workspace."
 
-  alias Jido.Workspace
+  alias Jido.Realm.Host
 
   @program ~S"""
   printf 'name?\n'
@@ -11,10 +11,10 @@ defmodule Jido.Workspace.Examples.AnswerPrompt do
   """
 
   def run(workspace) do
-    Workspace.run(workspace, ["sh", "-c", @program], stdin: :pipe, timeout_ms: 20_000)
+    Host.run(workspace, ["sh", "-c", @program], stdin: :pipe, timeout_ms: 20_000)
   end
 
   def answer(workspace, execution_id, line) do
-    Workspace.input(workspace, execution_id, line <> "\n")
+    Host.input(workspace, execution_id, line <> "\n")
   end
 end

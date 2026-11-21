@@ -2,7 +2,7 @@
 
 Open the same saved tree with different profiles. Read the report with
 the approved tool for each provider. Check the capabilities that
-Workspace recorded when it opened the handle.
+Realm recorded when it opened the handle.
 
 The example reuses the report reader from 03.03. Local uses an absolute
 path to its approved executable. Memory and the container runners use
@@ -24,7 +24,7 @@ registered `runsc` runtime. [Docker runtimes](https://docs.docker.com/engine/dae
 [gVisor Docker guide](https://gvisor.dev/docs/user_guide/quick_start/docker/)
 
 ```elixir
-config :jido_workspace,
+config :jido_realm,
   profiles: %{
     review: %{
       provider: :gvisor,
@@ -41,32 +41,32 @@ Use a saved reference from the `"reports"` store with a file at
 `reports/report.txt`. [Save and reopen a tree](../../README.md#save-and-reopen-after-a-beam-restart)
 
 ```elixir
-alias Jido.Workspace
-alias Jido.Workspace.Examples.ReadWithApprovedTool
+alias Jido.Realm.Host
+alias Jido.Realm.Host.Examples.ReadWithApprovedTool
 
-{:ok, workspace} = Workspace.open(profile: :review, from: snapshot)
+{:ok, workspace} = Host.open(profile: :review, from: snapshot)
 
 try do
   {:ok, %{capabilities: %{isolation: :gvisor, runtime: "runsc"}}} =
-    Workspace.info(workspace)
+    Host.info(workspace)
 
   {:ok, report} = ReadWithApprovedTool.read(workspace, "cat", "reports/report.txt")
   report
 after
-  :ok = Workspace.close(workspace)
+  :ok = Host.close(workspace)
 end
 ```
 
-Workspace matches `require.isolation` exactly. A `:docker` profile with
+Realm matches `require.isolation` exactly. A `:docker` profile with
 an isolation requirement of `:gvisor` returns `:unsupported_capability`.
 A `:gvisor` profile returns `:runtime_unavailable` when the engine does
 not list `runsc`. The error details identify the missing runtime.
-For each command, Workspace selects the configured runtime explicitly.
+For each command, Realm selects the configured runtime explicitly.
 
 Open checks registration. If the engine rejects a later container
 create and confirms removal, run returns `:start_failed`. The tree
 stays available for edits and saves. If cleanup cannot be confirmed,
-Workspace keeps writes and saves blocked.
+Realm keeps writes and saves blocked.
 
 ## Run the comparison
 

@@ -1,6 +1,6 @@
 # Memory search probes
 
-Run from the `jido_workspace` project root:
+Run from the `jido_realm` project root:
 
 ```sh
 mix run bench/search/probe.exs --runs 5 --output bench/search/results/probes-sparse.json

@@ -1,9 +1,9 @@
-defmodule Jido.Workspace.Deploy.CaptureSnapshotTest do
+defmodule Jido.Realm.Host.Deploy.CaptureSnapshotTest do
   use ExUnit.Case, async: true
+  alias Jido.Realm.Host.Deploy.Snapshot
   alias Jido.VFS
   alias Jido.VFS.Adapter.InMemory
   alias Jido.VFS.Capture
-  alias Jido.Workspace.Deploy.Snapshot
 
   test "conversion retains fixed bytes and modes after storage changes and stops" do
     fs = InMemory.configure(name: make_ref())

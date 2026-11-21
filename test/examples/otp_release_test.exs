@@ -1,17 +1,17 @@
-defmodule Jido.Workspace.Deploy.OTPReleaseTest do
+defmodule Jido.Realm.Host.Deploy.OTPReleaseTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag timeout: 120_000
-  alias Jido.Workspace.Deploy
-  alias Jido.Workspace.Deploy.OTP
-  alias Jido.Workspace.Sandbox
+  alias Jido.Realm.Host.Deploy
+  alias Jido.Realm.Host.Deploy.OTP
+  alias Jido.Realm.Host.Sandbox
 
   test "real appup and relup preserve live state and support an explicit downgrade" do
     {:ok, sandbox} = Sandbox.open()
     on_exit(fn -> Sandbox.destroy(sandbox) end)
-    artifacts = Jido.Workspace.Deploy.Test.Releases.build(Path.join(sandbox.root, "build"))
+    artifacts = Jido.Realm.Host.Deploy.Test.Releases.build(Path.join(sandbox.root, "build"))
     assert {:ok, target} = OTP.start(sandbox, "counter", artifacts["1"])
-    Jido.Workspace.TestSupport.TargetCoverage.start(target)
+    Jido.Realm.Host.TestSupport.TargetCoverage.start(target)
     assert {:ok, session} = Deploy.connect(target)
 
     assert {:ok, {pid, ~c"1", %{count: 10, requests: 0}}} =
@@ -59,9 +59,9 @@ defmodule Jido.Workspace.Deploy.OTPReleaseTest do
   test "failed behavior verification blocks deployment until explicit recovery" do
     {:ok, sandbox} = Sandbox.open()
     on_exit(fn -> Sandbox.destroy(sandbox) end)
-    artifacts = Jido.Workspace.Deploy.Test.Releases.build(Path.join(sandbox.root, "build"))
+    artifacts = Jido.Realm.Host.Deploy.Test.Releases.build(Path.join(sandbox.root, "build"))
     {:ok, target} = OTP.start(sandbox, "counter", artifacts["1"])
-    Jido.Workspace.TestSupport.TargetCoverage.start(target)
+    Jido.Realm.Host.TestSupport.TargetCoverage.start(target)
     {:ok, session} = Deploy.connect(target)
 
     {:ok, plan} =
@@ -80,9 +80,9 @@ defmodule Jido.Workspace.Deploy.OTPReleaseTest do
   test "a refused migration guard leaves the release, state, and PID unchanged" do
     {:ok, sandbox} = Sandbox.open()
     on_exit(fn -> Sandbox.destroy(sandbox) end)
-    artifacts = Jido.Workspace.Deploy.Test.Releases.build(Path.join(sandbox.root, "build"))
+    artifacts = Jido.Realm.Host.Deploy.Test.Releases.build(Path.join(sandbox.root, "build"))
     {:ok, target} = OTP.start(sandbox, "counter", artifacts["1"])
-    Jido.Workspace.TestSupport.TargetCoverage.start(target)
+    Jido.Realm.Host.TestSupport.TargetCoverage.start(target)
     {:ok, session} = Deploy.connect(target)
     {:ok, before} = OTP.call(target, :counter_server, :inspect, [])
 

@@ -1,19 +1,19 @@
 Code.require_file("../support.exs", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.ConcurrentReportsTest do
+defmodule Jido.Realm.Host.Examples.ConcurrentReportsTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution}
-  alias Jido.Workspace.Examples.ConcurrentReports
-  import Jido.Workspace.Examples.LifecycleSupport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution}
+  alias Jido.Realm.Host.Examples.ConcurrentReports
+  import Jido.Realm.Host.Examples.LifecycleSupport
 
   setup %{tmp_dir: root} do
     configure(root)
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
 
     profiles =
       Map.merge(profiles, %{
@@ -25,7 +25,7 @@ defmodule Jido.Workspace.Examples.ConcurrentReportsTest do
         docker_deadline: Map.put(profiles.docker, :limits, %{timeout_ms: 1_000})
       })
 
-    Application.put_env(:jido_workspace, :profiles, profiles)
+    Application.put_env(:jido_realm, :profiles, profiles)
     %{owners: start_supervised!(Task.Supervisor)}
   end
 
@@ -42,22 +42,22 @@ defmodule Jido.Workspace.Examples.ConcurrentReportsTest do
     try do
       task = ConcurrentReports.read(workspace, timeout_ms: 30_000)
       assert {:error, %Error{code: :quiescence_unknown}} = Task.await(task, 2_000)
-      assert {:ok, %{phase: :quiescence_unknown}} = Workspace.info(workspace)
-      assert {:error, %Error{code: :quiescence_unknown}} = Workspace.save(workspace)
+      assert {:ok, %{phase: :quiescence_unknown}} = Host.info(workspace)
+      assert {:error, %Error{code: :quiescence_unknown}} = Host.save(workspace)
     after
       resume.()
     end
 
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.close(workspace)
   end
 
   test "invalid host limits fail profile admission" do
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
 
     for limits <- [%{timeout_ms: 0}, %{output_limit: -1}, %{output_bytes: 10}] do
       invalid = Map.put(profiles.memory, :limits, limits)
-      Application.put_env(:jido_workspace, :profiles, Map.put(profiles, :invalid, invalid))
-      assert {:error, %Error{code: :invalid_profile}} = Workspace.open(profile: :invalid)
+      Application.put_env(:jido_realm, :profiles, Map.put(profiles, :invalid, invalid))
+      assert {:error, %Error{code: :invalid_profile}} = Host.open(profile: :invalid)
     end
   end
 
@@ -79,39 +79,39 @@ defmodule Jido.Workspace.Examples.ConcurrentReportsTest do
     {_controller, sandbox} = provider(workspace, :native)
     clean_up_docker_on_failure(sandbox)
 
-    task = Task.async(fn -> Workspace.run(workspace, ["sleep", "60"], timeout_ms: 30_000) end)
+    task = Task.async(fn -> Host.run(workspace, ["sleep", "60"], timeout_ms: 30_000) end)
     assert {:ok, %Execution{status: :timed_out, exit_status: nil}} = Task.await(task, 10_000)
     assert [] = containers(sandbox, ["--filter", "status=running"])
-    assert {:ok, %{kind: "snapshot"}} = Workspace.save(workspace)
-    assert :ok = Workspace.close(workspace)
+    assert {:ok, %{kind: "snapshot"}} = Host.save(workspace)
+    assert :ok = Host.close(workspace)
   end
 
   defp exercise_pair(owners, first_profile, second_profile, hold_read) do
     first = open(owners, first_profile, "alpha-message")
     second = open(owners, second_profile, "beta-message")
-    assert {:ok, %{owner: first_owner}} = Workspace.info(first)
-    assert {:ok, %{owner: second_owner}} = Workspace.info(second)
+    assert {:ok, %{owner: first_owner}} = Host.info(first)
+    assert {:ok, %{owner: second_owner}} = Host.info(second)
     assert first_owner != second_owner
     assert first.id != second.id
-    assert {:ok, "alpha-message"} = Workspace.read(first, "report.txt")
-    assert {:ok, "beta-message"} = Workspace.read(second, "report.txt")
+    assert {:ok, "alpha-message"} = Host.read(first, "report.txt")
+    assert {:ok, "beta-message"} = Host.read(second, "report.txt")
 
     {first_task, finish_first, first_released?} = hold_read.(first)
     {second_task, finish_second, second_released?} = hold_read.(second)
     first_execution = running_id(first)
     second_execution = running_id(second)
     assert first_execution != second_execution
-    assert {:error, %Error{code: :busy}} = Workspace.save(first)
-    assert {:error, %Error{code: :busy}} = Workspace.save(second)
+    assert {:error, %Error{code: :busy}} = Host.save(first)
+    assert {:error, %Error{code: :busy}} = Host.save(second)
 
     finish_first.()
 
     assert {:ok, %Execution{id: ^first_execution, output: "alpha", truncated: true}} =
              Task.await(first_task, 10_000)
 
-    assert {:ok, first_snapshot} = Workspace.save(first)
-    assert :ok = Workspace.close(first)
-    assert {:error, %Error{code: :closed}} = Workspace.read(first, "report.txt")
+    assert {:ok, first_snapshot} = Host.save(first)
+    assert :ok = Host.close(first)
+    assert {:error, %Error{code: :closed}} = Host.read(first, "report.txt")
     assert first_released?.()
     assert ^second_execution = running_id(second)
 
@@ -120,11 +120,11 @@ defmodule Jido.Workspace.Examples.ConcurrentReportsTest do
     assert {:ok, %Execution{id: ^second_execution, output: "beta-mes", truncated: true}} =
              Task.await(second_task, 10_000)
 
-    assert :ok = Workspace.write(second, "report.txt", "Second survived")
+    assert :ok = Host.write(second, "report.txt", "Second survived")
     smaller_read = ConcurrentReports.read(second, output_limit: 3)
     assert {:ok, %Execution{output: "Sec", truncated: true}} = Task.await(smaller_read, 10_000)
-    assert {:ok, second_snapshot} = Workspace.save(second)
-    assert :ok = Workspace.close(second)
+    assert {:ok, second_snapshot} = Host.save(second)
+    assert :ok = Host.close(second)
     assert second_released?.()
 
     assert_snapshot(first_profile, first_snapshot, "alpha-message")
@@ -139,15 +139,15 @@ defmodule Jido.Workspace.Examples.ConcurrentReportsTest do
         end
       end)
 
-    assert {:ok, workspace} = Workspace.open(profile: profile, owner: owner)
-    assert :ok = Workspace.write(workspace, "report.txt", report)
+    assert {:ok, workspace} = Host.open(profile: profile, owner: owner)
+    assert :ok = Host.write(workspace, "report.txt", report)
     workspace
   end
 
   defp running_id(workspace) do
     await(
       fn ->
-        case Workspace.info(workspace) do
+        case Host.info(workspace) do
           {:ok, %{phase: :running, active_execution_id: id}} -> id
           _ -> nil
         end
@@ -169,7 +169,7 @@ defmodule Jido.Workspace.Examples.ConcurrentReportsTest do
 
     task =
       Task.async(fn ->
-        Workspace.run(
+        Host.run(
           workspace,
           ["sh", "-c", ~S(mkfifo /tmp/finish && read -r line </tmp/finish && cat report.txt)],
           output_limit: 100
@@ -198,12 +198,12 @@ defmodule Jido.Workspace.Examples.ConcurrentReportsTest do
   end
 
   defp assert_snapshot(profile, snapshot, report) do
-    assert {:ok, workspace} = Workspace.open(profile: profile, from: snapshot)
+    assert {:ok, workspace} = Host.open(profile: profile, from: snapshot)
 
     try do
-      assert {:ok, ^report} = Workspace.read(workspace, "report.txt")
+      assert {:ok, ^report} = Host.read(workspace, "report.txt")
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 end

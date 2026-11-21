@@ -1,36 +1,36 @@
 Code.require_file("../support.exs", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.FinishWorkTest do
+defmodule Jido.Realm.Host.Examples.FinishWorkTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.Error
-  alias Jido.Workspace.Examples.FinishWork
-  import Jido.Workspace.Examples.LifecycleSupport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.Error
+  alias Jido.Realm.Host.Examples.FinishWork
+  import Jido.Realm.Host.Examples.LifecycleSupport
 
   setup %{tmp_dir: root}, do: configure(root)
 
   test "close waits for an accepted save and blocks another writer after the wait expires" do
     {workspace, first} = prepare(:memory)
-    assert :ok = Workspace.write(workspace, "report.txt", "New report")
+    assert :ok = Host.write(workspace, "report.txt", "New report")
     {controller, memory} = provider(workspace, :memory)
 
     {save, retry} =
       paused(memory.lifetime, fn ->
-        save = Task.async(fn -> Workspace.save(workspace) end)
+        save = Task.async(fn -> Host.save(workspace) end)
         await_job(controller, :save)
-        assert {:ok, %{phase: :saving}} = Workspace.info(workspace)
+        assert {:ok, %{phase: :saving}} = Host.info(workspace)
 
         assert {:cleanup_unconfirmed, ^workspace, ^first} =
                  FinishWork.close(workspace, first, 100)
 
-        assert {:ok, %{phase: :closing}} = Workspace.info(workspace)
+        assert {:ok, %{phase: :closing}} = Host.info(workspace)
         assert_closed_to_work(workspace)
 
-        retry = Task.async(fn -> Workspace.close(workspace, timeout_ms: 5_000) end)
+        retry = Task.async(fn -> Host.close(workspace, timeout_ms: 5_000) end)
 
         await(
           fn ->
@@ -47,7 +47,7 @@ defmodule Jido.Workspace.Examples.FinishWorkTest do
     assert later != first
     assert :ok = Task.await(retry)
     assert {:closed, ^later} = FinishWork.close(workspace, later, 5_000)
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.close(workspace)
     assert_report(first, "Original")
     assert_report(later, "New report")
   end
@@ -59,13 +59,13 @@ defmodule Jido.Workspace.Examples.FinishWorkTest do
 
     save =
       paused(memory.lifetime, fn ->
-        save = Task.async(fn -> Workspace.save(workspace) end)
+        save = Task.async(fn -> Host.save(workspace) end)
         await_job(controller, :save)
 
         assert {:error, %Error{code: :cleanup_unconfirmed}} =
-                 Workspace.close(workspace, timeout_ms: 100)
+                 Host.close(workspace, timeout_ms: 100)
 
-        Application.put_env(:jido_workspace, :stores, %{
+        Application.put_env(:jido_realm, :stores, %{
           "reports" => Path.join(root, "report-file")
         })
 
@@ -74,8 +74,8 @@ defmodule Jido.Workspace.Examples.FinishWorkTest do
       end)
 
     assert {:error, %Error{operation: :save}} = Task.await(save)
-    assert :ok = Workspace.close(workspace)
-    Application.put_env(:jido_workspace, :stores, %{"reports" => root})
+    assert :ok = Host.close(workspace)
+    Application.put_env(:jido_realm, :stores, %{"reports" => root})
     assert_report(first, "Original")
   end
 
@@ -85,7 +85,7 @@ defmodule Jido.Workspace.Examples.FinishWorkTest do
 
     command =
       paused(memory.lifetime, fn ->
-        command = Task.async(fn -> Workspace.run(workspace, ["cat", "report.txt"]) end)
+        command = Task.async(fn -> Host.run(workspace, ["cat", "report.txt"]) end)
         await_job(controller, :run)
 
         assert {:cleanup_unconfirmed, ^workspace, ^snapshot} =
@@ -96,7 +96,7 @@ defmodule Jido.Workspace.Examples.FinishWorkTest do
       end)
 
     assert {:ok, %{exit_status: 0, output: "Original"}} = Task.await(command)
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.close(workspace)
     assert_report(snapshot, "Original")
   end
 
@@ -106,13 +106,13 @@ defmodule Jido.Workspace.Examples.FinishWorkTest do
 
     paused(memory.lifetime, fn ->
       assert {:error, %Error{code: :cleanup_unconfirmed}} =
-               Workspace.close(workspace, timeout_ms: 100)
+               Host.close(workspace, timeout_ms: 100)
 
       await_job(controller, :release)
       assert_closed_to_work(workspace)
     end)
 
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.close(workspace)
     assert_closed_to_work(workspace)
   end
 
@@ -141,7 +141,7 @@ defmodule Jido.Workspace.Examples.FinishWorkTest do
              FinishWork.close(workspace, snapshot, 100)
 
     assert_closed_to_work(workspace)
-    assert {:error, %Error{code: :cleanup_unconfirmed}} = Workspace.close(workspace)
+    assert {:error, %Error{code: :cleanup_unconfirmed}} = Host.close(workspace)
     assert_report(snapshot, "Original")
   end
 
@@ -157,7 +157,7 @@ defmodule Jido.Workspace.Examples.FinishWorkTest do
     # The test releases the command with a pipe outside the managed tree.
     command =
       Task.async(fn ->
-        Workspace.run(
+        Host.run(
           workspace,
           [
             "sh",
@@ -186,16 +186,16 @@ defmodule Jido.Workspace.Examples.FinishWorkTest do
 
     assert {:ok, %{exit_status: 0, output: "finished"}} = Task.await(command, 10_000)
     assert {:closed, ^snapshot} = FinishWork.close(workspace, snapshot, 10_000)
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.close(workspace)
     assert [] = containers(sandbox)
     refute File.exists?(sandbox.root)
     assert_report(snapshot, "Original")
   end
 
   defp prepare(profile) do
-    assert {:ok, workspace} = Workspace.open(profile: profile)
-    assert :ok = Workspace.write(workspace, "report.txt", "Original")
-    assert {:ok, snapshot} = Workspace.save(workspace)
+    assert {:ok, workspace} = Host.open(profile: profile)
+    assert :ok = Host.write(workspace, "report.txt", "Original")
+    assert {:ok, snapshot} = Host.save(workspace)
     {workspace, snapshot}
   end
 
@@ -217,18 +217,18 @@ defmodule Jido.Workspace.Examples.FinishWorkTest do
   end
 
   defp assert_closed_to_work(workspace) do
-    assert {:error, %Error{code: :closed}} = Workspace.write(workspace, "report.txt", "Refused")
-    assert {:error, %Error{code: :closed}} = Workspace.save(workspace)
-    assert {:error, %Error{code: :closed}} = Workspace.run(workspace, ["cat", "report.txt"])
+    assert {:error, %Error{code: :closed}} = Host.write(workspace, "report.txt", "Refused")
+    assert {:error, %Error{code: :closed}} = Host.save(workspace)
+    assert {:error, %Error{code: :closed}} = Host.run(workspace, ["cat", "report.txt"])
   end
 
   defp assert_report(snapshot, report) do
-    assert {:ok, reopened} = Workspace.open(profile: :memory, from: snapshot)
+    assert {:ok, reopened} = Host.open(profile: :memory, from: snapshot)
 
     try do
-      assert {:ok, ^report} = Workspace.read(reopened, "report.txt")
+      assert {:ok, ^report} = Host.read(reopened, "report.txt")
     after
-      assert :ok = Workspace.close(reopened)
+      assert :ok = Host.close(reopened)
     end
   end
 end

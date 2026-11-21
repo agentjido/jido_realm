@@ -1,17 +1,17 @@
 Code.require_file("support.exs", __DIR__)
 
-defmodule Jido.Workspace.Examples.RecoverOldCommandTest do
+defmodule Jido.Realm.Host.Examples.RecoverOldCommandTest do
   use ExUnit.Case, async: false
   @moduletag :integration
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{CommandRef, Error, InfrastructureRef}
-  alias Jido.Workspace.Examples.{MachinePool, MachineProvider, RecoveryHost, RecoveryProvider}
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{CommandRef, Error, InfrastructureRef}
+  alias Jido.Realm.Host.Examples.{MachinePool, MachineProvider, RecoveryHost, RecoveryProvider}
 
-  import Jido.Workspace.Examples.RecoverySupport
+  import Jido.Realm.Host.Examples.RecoverySupport
 
   defmodule UncertainProvider do
-    @behaviour Jido.Workspace.Provider
+    @behaviour Jido.Realm.Host.Provider
 
     @impl true
     defdelegate provision(lease, settings, capture), to: RecoveryProvider
@@ -38,7 +38,7 @@ defmodule Jido.Workspace.Examples.RecoverOldCommandTest do
   end
 
   test "only a recovery-capable profile with the recovery grant can act" do
-    Application.put_env(:jido_workspace, :profiles, %{
+    Application.put_env(:jido_realm, :profiles, %{
       memory: %{provider: :memory, policy: :full_access},
       no_hook: %{
         provider: {MachineProvider, %{}},
@@ -51,54 +51,54 @@ defmodule Jido.Workspace.Examples.RecoverOldCommandTest do
     ref = reference("provider-resource", "command-1")
 
     assert {:error, %Error{code: :invalid_command_reference}} =
-             Workspace.recover_command(:no_grant, ref.infrastructure, :inspect)
+             Host.recover_command(:no_grant, ref.infrastructure, :inspect)
 
     assert {:error, %Error{code: :invalid_input}} =
-             Workspace.recover_command(:no_grant, ref, :restart)
+             Host.recover_command(:no_grant, ref, :restart)
 
     assert {:error, %Error{code: :invalid_input}} =
-             Workspace.recover_command(:no_grant, ref, :wait, timeout_ms: 0)
+             Host.recover_command(:no_grant, ref, :wait, timeout_ms: 0)
 
     for name <- [:no_hook, :memory] do
       assert {:error,
               %Error{code: :unsupported_capability, details: %{capability: :command_recovery}}} =
-               Workspace.recover_command(name, ref, :inspect)
+               Host.recover_command(name, ref, :inspect)
     end
 
     assert {:error, %Error{code: :policy_denied, details: %{action: :recover}}} =
-             Workspace.recover_command(:no_grant, ref, :stop)
+             Host.recover_command(:no_grant, ref, :stop)
 
     assert {:ok, other} = InfrastructureRef.new("other", "provider-resource")
     assert {:ok, other_ref} = CommandRef.new(other, "command-1")
 
     assert {:error, %Error{code: :infrastructure_mismatch}} =
-             Workspace.recover_command(:no_grant, other_ref, :inspect)
+             Host.recover_command(:no_grant, other_ref, :inspect)
 
-    assert {:ok, ws} = Workspace.open(profile: :memory)
+    assert {:ok, ws} = Host.open(profile: :memory)
 
     try do
       assert {:error, %Error{code: :unsupported_capability}} =
-               Workspace.run(ws, ["echo", "test"], command: ref)
+               Host.run(ws, ["echo", "test"], command: ref)
 
       assert {:error, %Error{}} =
-               Workspace.batch(ws, [{:write, "before", "data"}, {:run, ["echo"], [command: ref]}])
+               Host.batch(ws, [{:write, "before", "data"}, {:run, ["echo"], [command: ref]}])
 
-      assert {:error, %Error{code: :not_found}} = Workspace.read(ws, "before")
+      assert {:error, %Error{code: :not_found}} = Host.read(ws, "before")
     after
-      assert :ok = Workspace.close(ws)
+      assert :ok = Host.close(ws)
     end
   end
 
   test "an unconfirmed stop or a timed out recovery call cannot report exit" do
     recovery = %{profile(%{}, [:recover]) | provider: {UncertainProvider, self()}}
-    Application.put_env(:jido_workspace, :profiles, %{recovery: recovery})
+    Application.put_env(:jido_realm, :profiles, %{recovery: recovery})
     ref = reference("provider-resource", "command-1")
 
     assert {:error, %Error{code: :quiescence_unknown}} =
-             Workspace.recover_command(:recovery, ref, :stop)
+             Host.recover_command(:recovery, ref, :stop)
 
     task =
-      Task.async(fn -> Workspace.recover_command(:recovery, ref, :wait, timeout_ms: 750) end)
+      Task.async(fn -> Host.recover_command(:recovery, ref, :wait, timeout_ms: 750) end)
 
     assert_receive {:recovery_waiting, worker}, 1_000
     monitor = Process.monitor(worker)
@@ -119,53 +119,53 @@ defmodule Jido.Workspace.Examples.RecoverOldCommandTest do
     json = Jason.encode!(ref)
     ref_path = Path.join(root, "command.json")
     File.write!(ref_path, json)
-    assert {:ok, ws} = Workspace.open(profile: :lost_reply, infrastructure: machine)
+    assert {:ok, ws} = Host.open(profile: :lost_reply, infrastructure: machine)
 
     assert {:error, %Error{code: :infrastructure_mismatch}} =
-             Workspace.run(ws, ["write-report"], command: reference("other-resource", "job"))
+             Host.run(ws, ["write-report"], command: reference("other-resource", "job"))
 
     assert {:error, %Error{code: :quiescence_unknown}} =
-             Workspace.run(ws, ["write-report"], command: ref)
+             Host.run(ws, ["write-report"], command: ref)
 
     assert :ok = await_start(tree, ref)
 
     assert {:error, %Error{code: :quiescence_unknown}} =
-             Workspace.write(ws, "error.txt", "blocked")
+             Host.write(ws, "error.txt", "blocked")
 
-    assert {:error, %Error{code: :quiescence_unknown}} = Workspace.save(ws)
+    assert {:error, %Error{code: :quiescence_unknown}} = Host.save(ws)
 
     assert {:error, %Error{code: :infrastructure_busy}} =
-             Workspace.open(profile: :run, infrastructure: machine)
+             Host.open(profile: :run, infrastructure: machine)
 
     recovered = ref_path |> File.read!() |> Jason.decode!()
 
     assert {:ok, %{status: :running, exit_status: nil}} =
-             Workspace.recover_command(:recovery, recovered, :inspect)
+             Jido.Realm.Host.recover_command(:recovery, recovered, :inspect)
 
     assert {:ok, %{status: :running}} =
-             Workspace.recover_command(:recovery, recovered, :wait, timeout_ms: 450)
+             Host.recover_command(:recovery, recovered, :wait, timeout_ms: 450)
 
     assert {:error, %Error{code: :command_not_found}} =
-             Workspace.recover_command(:recovery, new_reference(machine, "other"), :inspect)
+             Host.recover_command(:recovery, new_reference(machine, "other"), :inspect)
 
     path = RecoveryHost.job_path(tree, ref)
     assert :ok = File.touch(Path.join(path, "finish"))
 
     assert {:ok, %{status: :exited, exit_status: 0}} =
-             Workspace.recover_command(:recovery, recovered, :wait, timeout_ms: 5_000)
+             Host.recover_command(:recovery, recovered, :wait, timeout_ms: 5_000)
 
-    assert :ok = Workspace.close(ws)
-    assert {:ok, retry} = Workspace.open(profile: :run, infrastructure: machine)
+    assert :ok = Host.close(ws)
+    assert {:ok, retry} = Host.open(profile: :run, infrastructure: machine)
 
     try do
       assert {:error, %Error{code: :command_reference_used}} =
-               Workspace.run(retry, ["write-report"], command: recovered)
+               Host.run(retry, ["write-report"], command: recovered)
 
       assert File.read!(Path.join(path, "starts")) == "started\n"
       assert File.read!(Path.join(path, "report")) == "complete\n"
-      assert :ok = Workspace.write(retry, "after.txt", "usable")
+      assert :ok = Host.write(retry, "after.txt", "usable")
     after
-      assert :ok = Workspace.close(retry)
+      assert :ok = Host.close(retry)
     end
   end
 
@@ -185,8 +185,8 @@ defmodule Jido.Workspace.Examples.RecoverOldCommandTest do
 
     script = """
     spawn(fn ->
-      {:ok, workspace} = Jido.Workspace.open(profile: :run, infrastructure: ref.infrastructure)
-      Jido.Workspace.run(workspace, ["write-report"], command: ref)
+      {:ok, workspace} = Jido.Realm.Host.open(profile: :run, infrastructure: ref.infrastructure)
+      Jido.Realm.Host.run(workspace, ["write-report"], command: ref)
     end)
     :submitted
     """
@@ -201,7 +201,7 @@ defmodule Jido.Workspace.Examples.RecoverOldCommandTest do
     assert {:ok, %{status: :running}} = recover_on(fresh, recovered, :inspect)
 
     assert {:error, %Error{code: :infrastructure_busy}} =
-             :peer.call(fresh, Workspace, :open, [[profile: :run, infrastructure: machine]])
+             :peer.call(fresh, Host, :open, [[profile: :run, infrastructure: machine]])
 
     assert {:ok, %{status: :exited, exit_status: status} = result} =
              recover_on(fresh, recovered, :stop)
@@ -215,9 +215,9 @@ defmodule Jido.Workspace.Examples.RecoverOldCommandTest do
              MachinePool.inspect_machine(pool, machine)
 
     assert {:error, %Error{code: :infrastructure_busy}} =
-             :peer.call(fresh, Workspace, :open, [[profile: :run, infrastructure: machine]])
+             :peer.call(fresh, Host, :open, [[profile: :run, infrastructure: machine]])
   end
 
   defp recover_on(peer, ref, action),
-    do: :peer.call(peer, Workspace, :recover_command, [:recovery, ref, action])
+    do: :peer.call(peer, Host, :recover_command, [:recovery, ref, action])
 end

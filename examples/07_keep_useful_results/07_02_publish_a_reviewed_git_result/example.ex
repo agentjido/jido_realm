@@ -1,4 +1,4 @@
-defmodule Jido.Workspace.Examples.PublishReviewedGit do
+defmodule Jido.Realm.Host.Examples.PublishReviewedGit do
   @moduledoc false
 
   @branch "refs/heads/reviewed"

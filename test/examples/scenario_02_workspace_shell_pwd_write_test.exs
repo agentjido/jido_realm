@@ -1,12 +1,12 @@
-defmodule Jido.Workspace.Integration.Scenario02WorkspaceShellPwdWriteTest do
+defmodule Jido.Realm.Host.Integration.Scenario02WorkspaceShellPwdWriteTest do
   use ExUnit.Case, async: false
 
   @moduledoc """
   Scenario 02 goal: Validate shell command execution and artifact changes in the same workspace.
   """
 
-  alias Jido.Workspace
-  alias Jido.Workspace.TestSupport.ScenarioHelpers
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.TestSupport.ScenarioHelpers
 
   @moduletag :integration
   @moduletag :local_integration
@@ -24,26 +24,26 @@ defmodule Jido.Workspace.Integration.Scenario02WorkspaceShellPwdWriteTest do
     end)
 
     try do
-      :ok = Workspace.mkdir(workspace, "/artifacts")
+      :ok = Host.mkdir(workspace, "/artifacts")
       ScenarioHelpers.put_workspace(workspace)
 
-      {:ok, %{output: pwd_output}} = Workspace.run(workspace, "pwd")
+      {:ok, %{output: pwd_output}} = Host.run(workspace, "pwd")
       ScenarioHelpers.put_workspace(workspace)
 
-      :ok = Workspace.write(workspace, "/artifacts/pwd_output.txt", pwd_output)
+      :ok = Host.write(workspace, "/artifacts/pwd_output.txt", pwd_output)
       ScenarioHelpers.put_workspace(workspace)
 
       {:ok, %{output: write_output}} =
-        Workspace.run(workspace, "write /artifacts/from_shell.txt hello")
+        Host.run(workspace, "write /artifacts/from_shell.txt hello")
 
       ScenarioHelpers.put_workspace(workspace)
       assert String.contains?(write_output, "wrote")
 
-      {:ok, %{output: cat_output}} = Workspace.run(workspace, "cat /artifacts/from_shell.txt")
+      {:ok, %{output: cat_output}} = Host.run(workspace, "cat /artifacts/from_shell.txt")
       ScenarioHelpers.put_workspace(workspace)
       assert String.trim(cat_output) == "hello"
 
-      assert {:ok, "hello"} = Workspace.read(workspace, "/artifacts/from_shell.txt")
+      assert {:ok, "hello"} = Host.read(workspace, "/artifacts/from_shell.txt")
 
       transcript =
         [
@@ -59,11 +59,11 @@ defmodule Jido.Workspace.Integration.Scenario02WorkspaceShellPwdWriteTest do
         |> Enum.join("\n")
 
       :ok =
-        Workspace.write(workspace, "/artifacts/command_transcript.txt", transcript)
+        Host.write(workspace, "/artifacts/command_transcript.txt", transcript)
 
       ScenarioHelpers.put_workspace(workspace)
 
-      :ok = Workspace.stop_session(workspace)
+      :ok = Host.stop_session(workspace)
       ScenarioHelpers.put_workspace(workspace)
 
       summary_json =
@@ -78,7 +78,7 @@ defmodule Jido.Workspace.Integration.Scenario02WorkspaceShellPwdWriteTest do
           ]
         )
 
-      :ok = Workspace.write(workspace, @summary_path, summary_json)
+      :ok = Host.write(workspace, @summary_path, summary_json)
       ScenarioHelpers.put_workspace(workspace)
 
       summary_file = Path.join(output_root, "artifacts/run_summary.json")

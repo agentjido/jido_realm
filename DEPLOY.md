@@ -1,18 +1,18 @@
-# Workspace Deploy
+# Realm Deploy
 
 A local deployment SDK with a Capistrano-style flow: named targets, staged
 payloads, ordered preparation, activation, verification, and explicit recovery.
 It supports OTP releases first and Node.js source deployment second.
 
-Deploy uses `Jido.Workspace.Sandbox` inside the `jido_workspace` package.
-Workspace policy controls deployment. The same package supplies the file and
+Deploy uses `Jido.Realm.Host.Sandbox` inside the `jido_realm` package.
+Realm policy controls deployment. The same package supplies the file and
 command APIs. Use Deploy directly in a BEAM application.
 
 ## Boundaries
 
 | Object | Purpose |
 | --- | --- |
-| `Snapshot` | Relative paths, file bytes, normalized modes, directory paths from saved Workspace trees, source ID, content digest |
+| `Snapshot` | Relative paths, file bytes, normalized modes, directory paths from saved Realm trees, source ID, content digest |
 | `Artifact` | Versioned source payload or OTP release payload |
 | `Target` | Name, stage, roles, sandbox, destination path, and optional BEAM service |
 | `Recipe` | Source preparation commands, service specification, verification command |
@@ -20,7 +20,7 @@ command APIs. Use Deploy directly in a BEAM application.
 | Operation record | Actual steps, results, before/after observations, and recovery link |
 
 Callers own source acceptance, build tools, and behavior contracts.
-Workspace owns deployment permission checks. Deploy checks content identity and target conditions. It does not
+Realm owns deployment permission checks. Deploy checks content identity and target conditions. It does not
 claim that arbitrary source is safe or correct.
 
 ## OTP release upgrade
@@ -46,10 +46,10 @@ scripts can use the `DEPLOY_LIB` boot variable for the target's `lib` directory.
 The integration fixture shows `systools.make_script` and `systools.make_relup`.
 
 ```elixir
-alias Jido.Workspace.Deploy
-alias Jido.Workspace.Deploy.{Artifact, OTP, Snapshot}
+alias Jido.Realm.Host.Deploy
+alias Jido.Realm.Host.Deploy.{Artifact, OTP, Snapshot}
 
-{:ok, sandbox} = Jido.Workspace.Sandbox.open()
+{:ok, sandbox} = Jido.Realm.Host.Sandbox.open()
 {:ok, initial_files} = Snapshot.from_directory("/absolute/releases/counter-1",
   id: "accepted-source-1")
 {:ok, initial} = Artifact.new(:otp, "1", initial_files)
@@ -86,20 +86,20 @@ State migration belongs in explicit OTP `code_change/3` callbacks and `.appup`
 instructions. Traffic can continue after planning. OTP supplies the state that
 exists when it performs the transition. The counter test proves that requests
 after planning are preserved. It tests both upgrade and downgrade migration.
-See [Upgrade an OTP release](https://github.com/agentjido/jido_workspace/tree/main/examples/08_deployment_and_application_workflows/08_04_upgrade_an_otp_release).
+See [Upgrade an OTP release](https://github.com/agentjido/jido_realm/tree/main/examples/08_deployment_and_application_workflows/08_04_upgrade_an_otp_release).
 
 The SDK does not make a release permanent. Normal restart boots the initial
 permanent release. Persistent boot selection and ERTS replacement are later work.
 
-## Saved Workspace trees
+## Saved workspace trees
 
-Pass the reference from `Jido.Workspace.save/1` to `Snapshot.from_saved/2`.
+Pass the reference from `Jido.Realm.Host.save/1` to `Snapshot.from_saved/2`.
 The receiving BEAM needs a profile with `:read` and `:import` grants and access
 to the store named in the reference. This conversion reads and verifies the
 saved bundle directly. The source workspace can already be closed.
 
 ```elixir
-alias Jido.Workspace.Deploy.{Artifact, Snapshot}
+alias Jido.Realm.Host.Deploy.{Artifact, Snapshot}
 
 {:ok, snapshot} = Snapshot.from_saved(saved_reference, profile: :reports_reader)
 {:ok, artifact} = Artifact.new(:source, "report-1", snapshot)
@@ -109,7 +109,7 @@ Deploy records the saved reference as `snapshot_id` and a separate payload
 digest. The payload contains file bytes, regular and executable modes, and
 directory paths, including empty directories. Deploy checks the saved entries
 again after preparation, before it switches the active source link. See
-[Deploy a saved tree](https://github.com/agentjido/jido_workspace/tree/main/examples/08_deployment_and_application_workflows/08_02_deploy_a_saved_tree)
+[Deploy a saved tree](https://github.com/agentjido/jido_realm/tree/main/examples/08_deployment_and_application_workflows/08_02_deploy_a_saved_tree)
 for the complete setup and checks.
 
 ## VFS memory captures
@@ -119,16 +119,16 @@ payload. The conversion reads the capture, not the live filesystem. It also
 works after the memory storage process stops.
 
 ```elixir
-alias Jido.Workspace
-alias Jido.Workspace.Deploy.{Artifact, Snapshot}
+alias Jido.Realm.Host
+alias Jido.Realm.Host.Deploy.{Artifact, Snapshot}
 
-{:ok, workspace} = Workspace.open(policy: :workspace_write)
-:ok = Workspace.write(workspace, "/message.txt", "accepted content")
-{:ok, saved, _revision} = Workspace.capture(workspace)
-:ok = Workspace.write(workspace, "/message.txt", "later draft")
+{:ok, workspace} = Host.open(policy: :workspace_write)
+:ok = Host.write(workspace, "/message.txt", "accepted content")
+{:ok, saved, _revision} = Host.capture(workspace)
+:ok = Host.write(workspace, "/message.txt", "later draft")
 {:ok, snapshot} = Snapshot.from_capture(saved, id: "accepted-source-42")
 {:ok, artifact} = Artifact.new(:source, "42", snapshot)
-:ok = Workspace.close(workspace)
+:ok = Host.close(workspace)
 
 # Deploy the saved content through a separately opened Sandbox target.
 {:ok, plan} = Deploy.prepare(session, artifact)
@@ -181,7 +181,7 @@ recovery recipe must include a verify command.
 A failure before recovery changes the target keeps the original blocker. If
 recovery leaves the target in an uncertain state, the recovery operation becomes
 the blocker. Successful recovery clears the blocker and retains the previous
-operation records. See [Verify and recover a deployment](https://github.com/agentjido/jido_workspace/tree/main/examples/08_deployment_and_application_workflows/08_03_verify_and_recover_a_deployment).
+operation records. See [Verify and recover a deployment](https://github.com/agentjido/jido_realm/tree/main/examples/08_deployment_and_application_workflows/08_03_verify_and_recover_a_deployment).
 
 OTP recovery uses the release transition and its runtime checks. A downgrade
 requires a valid downgrade path and state migration. The host owns recovery of
@@ -210,13 +210,13 @@ the next release. Shared content stays outside snapshots. The spike reserves
 `shared/`; automatic shared-file links and release retention are later work.
 
 ```elixir
-alias Jido.Workspace.Deploy.{Artifact, Recipe, Snapshot}
+alias Jido.Realm.Host.Deploy.{Artifact, Recipe, Snapshot}
 
 {:ok, files} = Snapshot.from_directory("/absolute/node-app", id: "source-42")
 {:ok, artifact} = Artifact.new(:source, "42", files)
-{:ok, target} = Jido.Workspace.Deploy.source_target(sandbox, "node-app",
+{:ok, target} = Jido.Realm.Host.Deploy.source_target(sandbox, "node-app",
   stage: :test, roles: [:web])
-{:ok, session} = Jido.Workspace.Deploy.connect(target)
+{:ok, session} = Jido.Realm.Host.Deploy.connect(target)
 
 recipe = %Recipe{
   prepare: [{"node", ["--check", "server.js"]}],
@@ -224,9 +224,9 @@ recipe = %Recipe{
   verify: {"node", ["verify.js", "4001"]}
 }
 
-{:ok, plan} = Jido.Workspace.Deploy.prepare(session, artifact, recipe: recipe)
-{:ok, operation_id} = Jido.Workspace.Deploy.apply(session, plan)
-{:ok, record} = Jido.Workspace.Deploy.await(session, operation_id)
+{:ok, plan} = Jido.Realm.Host.Deploy.prepare(session, artifact, recipe: recipe)
+{:ok, operation_id} = Jido.Realm.Host.Deploy.apply(session, plan)
+{:ok, record} = Jido.Realm.Host.Deploy.await(session, operation_id)
 ```
 
 Commands can also use `{executable, args, options}`. Options include `env`,
@@ -253,7 +253,7 @@ The SDK does not require an external version-control system.
 Snapshot identity is distinct from content digest. A caller can retain its own
 BeamWeaver source ID when converting a VFS memory capture. Snapshots support
 regular and executable files. Deploy refuses symlinks and special files. Saved
-Workspace trees also retain empty directories.
+Realm trees also retain empty directories.
 
 Plans and operation records stay in controller memory. Target operation records
 stay in target memory. Controller or node loss requires inspection; exactly-once

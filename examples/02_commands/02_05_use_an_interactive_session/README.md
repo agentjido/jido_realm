@@ -2,7 +2,7 @@
 
 Use `stdin: :pipe` to talk to a running command. The host can set
 `require: %{stdin: :pipe}` in a Docker profile to check the capability
-when Workspace opens. Memory refuses a pipe request before the command
+when Realm opens. Memory refuses a pipe request before the command
 starts.
 
 [AnswerPrompt](example.ex) runs a program that prints a prompt, reads a
@@ -10,40 +10,40 @@ line, writes the reply to `name.txt`, and exits. Run the program in a
 client process so another process can read and send bytes.
 
 ```elixir
-alias Jido.Workspace
-alias Jido.Workspace.Examples.AnswerPrompt
+alias Jido.Realm.Host
+alias Jido.Realm.Host.Examples.AnswerPrompt
 
 task = Task.async(fn -> AnswerPrompt.run(workspace) end)
 
-# After Workspace admits the command, get its execution ID.
-{:ok, %{active_execution_id: id}} = Workspace.info(workspace)
+# After Realm admits the command, get its execution ID.
+{:ok, %{active_execution_id: id}} = Host.info(workspace)
 
 # Read until the prompt appears. Use the next offset for subsequent reads.
-{:ok, %{bytes: "name?\n", next_offset: offset}} = Workspace.output(workspace, id)
+{:ok, %{bytes: "name?\n", next_offset: offset}} = Host.output(workspace, id)
 :ok = AnswerPrompt.answer(workspace, id, "Ada")
 
 {:ok, %{exit_status: 0}} = Task.await(task)
-{:ok, %{bytes: "hello Ada\n", done?: true}} = Workspace.output(workspace, id, offset)
-{:ok, "Ada\n"} = Workspace.read(workspace, "name.txt")
+{:ok, %{bytes: "hello Ada\n", done?: true}} = Host.output(workspace, id, offset)
+{:ok, "Ada\n"} = Host.read(workspace, "name.txt")
 ```
 
 The tests wait for the execution ID and prompt with bounded waits.
 See [Stream live output](../02_02_stream_live_output/README.md) for a stream
-that reads each available slice. `Workspace.input/3` takes up to 16 KiB
+that reads each available slice. `Host.input/3` takes up to 16 KiB
 per call. A reply of `:ok` means the transport accepted the bytes.
 Read the program's output to confirm its response. Retry when the
 pipe reports `:input_not_ready` or `:input_busy`.
 
 ## Stop or disconnect
 
-`Workspace.cancel/2` stops new input immediately. Wait for the original
-run result before editing or saving. On client disconnect, Workspace
+`Host.cancel/2` stops new input immediately. Wait for the original
+run result before editing or saving. On client disconnect, Realm
 requests a stop when the process that called `run/3` exits. Connect a
 terminal or UI transport's disconnect to that process lifetime or call
 `cancel/2` from the transport. Closing the workspace also requests a
 stop for a command with a pipe.
 
-Workspace blocks writes and saves until the provider confirms that the
+Realm blocks writes and saves until the provider confirms that the
 command stopped. If confirmation fails, the tree stays fenced. If the
 workspace stays open, the caller can inspect partial files after
 confirmation. A snapshot is still a separate call.
@@ -66,4 +66,4 @@ checks refusal and continued use of ordinary commands. [Tests](example_test.exs)
 A single execution ID controls the input pipe, output, and cancellation.
 This example uses standard streams. Programs that require a terminal
 need a PTY and terminal controls. Pipe input stays open until the
-program exits or Workspace stops it. Batch steps use closed stdin.
+program exits or Realm stops it. Batch steps use closed stdin.

@@ -4,7 +4,7 @@ Code.require_file("real_support.exs", __DIR__)
 
 defmodule SearchSpike.RealRun do
   @moduledoc false
-  alias Jido.Workspace
+  alias Jido.Realm.Host
   alias SearchSpike.{Fixture, Probes, RealCorpus}
 
   @queries [
@@ -40,7 +40,7 @@ defmodule SearchSpike.RealRun do
       )
 
     File.mkdir_p!(root)
-    {:ok, workspace} = Workspace.open()
+    {:ok, workspace} = Host.open()
     Process.put(:real_sessions, [])
     :rand.seed(:exsss, {901, 902, 903})
 
@@ -124,7 +124,7 @@ defmodule SearchSpike.RealRun do
       IO.puts("Results: #{result_path}")
     after
       Enum.each(Process.get(:real_sessions), &Jido.Shell.ShellSession.stop/1)
-      Workspace.close(workspace)
+      Host.close(workspace)
       File.rm_rf!(root)
     end
   end
@@ -279,7 +279,7 @@ defmodule SearchSpike.RealRun do
     {vfs_us, _} =
       :timer.tc(fn ->
         Enum.each(changes, fn {path, data} ->
-          :ok = Workspace.write(workspace, "/" <> path, data)
+          :ok = Host.write(workspace, "/" <> path, data)
         end)
       end)
 

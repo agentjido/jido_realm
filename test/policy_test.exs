@@ -1,58 +1,58 @@
-defmodule Jido.Workspace.PolicyTest do
+defmodule Jido.Realm.Host.PolicyTest do
   use ExUnit.Case, async: false
-  alias Jido.Workspace
-  alias Jido.Workspace.{Deploy, Policy, Sandbox}
-  alias Jido.Workspace.Deploy.{Artifact, Snapshot, Target}
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Deploy, Policy, Sandbox}
+  alias Jido.Realm.Host.Deploy.{Artifact, Snapshot, Target}
 
   test "profiles refuse unknown permissions and profiles" do
     assert {:error, :invalid_policy} = Policy.validate(:unknown)
     assert {:error, {:policy_denied, :unknown}} = Policy.authorize(:full_access, :unknown)
 
-    assert {:error, %Jido.Workspace.Error{code: :invalid_input}} =
-             Workspace.open(policy: :unknown)
+    assert {:error, %Jido.Realm.Host.Error{code: :invalid_input}} =
+             Host.open(policy: :unknown)
 
     assert {:error, :invalid_policy} = Sandbox.open(policy: :unknown)
   end
 
   test "read only workspace permits capture and blocks mutation and shell handles" do
-    {:ok, workspace} = Workspace.open(policy: :read_only)
-    on_exit(fn -> Workspace.close(workspace) end)
-    assert {:ok, capture, token} = Workspace.capture(workspace)
-    assert {:ok, []} = Workspace.list(workspace)
+    {:ok, workspace} = Host.open(policy: :read_only)
+    on_exit(fn -> Host.close(workspace) end)
+    assert {:ok, capture, token} = Host.capture(workspace)
+    assert {:ok, []} = Host.list(workspace)
 
-    assert {:error, %Jido.Workspace.Error{code: :policy_denied}} =
-             Workspace.write(workspace, "/a", "a")
+    assert {:error, %Jido.Realm.Host.Error{code: :policy_denied}} =
+             Host.write(workspace, "/a", "a")
 
-    assert {:error, %Jido.Workspace.Error{code: :policy_denied}} =
-             Workspace.mkdir(workspace, "/dir")
+    assert {:error, %Jido.Realm.Host.Error{code: :policy_denied}} =
+             Host.mkdir(workspace, "/dir")
 
-    assert {:error, %Jido.Workspace.Error{code: :policy_denied}} =
-             Workspace.delete(workspace, "/a")
+    assert {:error, %Jido.Realm.Host.Error{code: :policy_denied}} =
+             Host.delete(workspace, "/a")
 
-    assert {:error, %Jido.Workspace.Error{code: :policy_denied}} =
-             Workspace.replace(workspace, capture, expected: token)
+    assert {:error, %Jido.Realm.Host.Error{code: :policy_denied}} =
+             Host.replace(workspace, capture, expected: token)
 
-    assert {:error, %Jido.Workspace.Error{code: :policy_denied}} = Workspace.filesystem(workspace)
+    assert {:error, %Jido.Realm.Host.Error{code: :policy_denied}} = Host.filesystem(workspace)
 
-    assert {:error, %Jido.Workspace.Error{code: :policy_denied, operation: :shell}} =
-             Workspace.shell(workspace)
+    assert {:error, %Jido.Realm.Host.Error{code: :policy_denied, operation: :shell}} =
+             Host.shell(workspace)
 
-    assert {:error, %Jido.Workspace.Error{code: :policy_denied}} =
-             Workspace.run(workspace, "echo blocked")
+    assert {:error, %Jido.Realm.Host.Error{code: :policy_denied}} =
+             Host.run(workspace, "echo blocked")
   end
 
   test "workspace write permits files and keeps execution closed" do
-    {:ok, workspace} = Workspace.open(policy: :workspace_write)
-    on_exit(fn -> Workspace.close(workspace) end)
-    assert :ok = Workspace.write(workspace, "/a", "a")
-    assert {:ok, "a"} = Workspace.read(workspace, "/a")
-    assert {:ok, saved, token} = Workspace.capture(workspace)
-    assert {:ok, _} = Workspace.replace(workspace, saved, expected: token)
+    {:ok, workspace} = Host.open(policy: :workspace_write)
+    on_exit(fn -> Host.close(workspace) end)
+    assert :ok = Host.write(workspace, "/a", "a")
+    assert {:ok, "a"} = Host.read(workspace, "/a")
+    assert {:ok, saved, token} = Host.capture(workspace)
+    assert {:ok, _} = Host.replace(workspace, saved, expected: token)
 
-    assert {:error, %Jido.Workspace.Error{code: :policy_denied}} =
-             Workspace.start_session(workspace)
+    assert {:error, %Jido.Realm.Host.Error{code: :policy_denied}} =
+             Host.start_session(workspace)
 
-    assert {:error, %Jido.Workspace.Error{code: :policy_denied}} = Workspace.filesystem(workspace)
+    assert {:error, %Jido.Realm.Host.Error{code: :policy_denied}} = Host.filesystem(workspace)
   end
 
   test "environment policy is authoritative for attached and modified handles" do

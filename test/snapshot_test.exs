@@ -1,6 +1,6 @@
-defmodule Jido.Workspace.Deploy.SnapshotTest do
+defmodule Jido.Realm.Host.Deploy.SnapshotTest do
   use ExUnit.Case, async: true
-  alias Jido.Workspace.Deploy.{Artifact, Snapshot}
+  alias Jido.Realm.Host.Deploy.{Artifact, Snapshot}
 
   test "source identity stays separate from a verified deterministic digest" do
     entry = %{bytes: "hello", mode: 0o755}
@@ -16,8 +16,8 @@ defmodule Jido.Workspace.Deploy.SnapshotTest do
   end
 
   test "projection refuses corrupted payloads, retains modes, and does not overwrite a release" do
-    {:ok, sandbox} = Jido.Workspace.Sandbox.open()
-    on_exit(fn -> Jido.Workspace.Sandbox.destroy(sandbox) end)
+    {:ok, sandbox} = Jido.Realm.Host.Sandbox.open()
+    on_exit(fn -> Jido.Realm.Host.Sandbox.destroy(sandbox) end)
     {:ok, snapshot} = Snapshot.new(%{"bin/run" => %{bytes: "hello", mode: 0o755}})
 
     assert {:error, :digest_mismatch} =

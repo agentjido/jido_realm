@@ -5,22 +5,22 @@ Code.require_file(
 
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 
-defmodule Jido.Workspace.Examples.IsolationProfilesTest do
+defmodule Jido.Realm.Host.Examples.IsolationProfilesTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution}
-  alias Jido.Workspace.Examples.ReadWithApprovedTool
-  import Jido.Workspace.Examples.LifecycleSupport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution}
+  alias Jido.Realm.Host.Examples.ReadWithApprovedTool
+  import Jido.Realm.Host.Examples.LifecycleSupport
 
   @path "reports/report.txt"
   @report "Reviewed report\n"
 
   setup %{tmp_dir: root} do
     configure(Path.join(root, "snapshots"))
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
     memory = Map.merge(profiles.memory, %{tools: ["cat"], require: %{isolation: :mediated}})
 
     local = %{
@@ -34,7 +34,7 @@ defmodule Jido.Workspace.Examples.IsolationProfilesTest do
     docker = Map.put(profiles.docker, :tools, ["cat"])
     gvisor = %{docker | provider: :gvisor, require: %{docker.require | isolation: :gvisor}}
 
-    Application.put_env(:jido_workspace, :profiles, %{
+    Application.put_env(:jido_realm, :profiles, %{
       memory: memory,
       local: local,
       docker: docker,
@@ -48,9 +48,9 @@ defmodule Jido.Workspace.Examples.IsolationProfilesTest do
 
     snapshot =
       with_workspace([profile: :memory], fn workspace ->
-        assert :ok = Workspace.mkdir(workspace, "reports")
-        assert :ok = Workspace.write(workspace, @path, @report)
-        assert {:ok, snapshot} = Workspace.save(workspace)
+        assert :ok = Host.mkdir(workspace, "reports")
+        assert :ok = Host.write(workspace, @path, @report)
+        assert {:ok, snapshot} = Host.save(workspace)
         snapshot
       end)
 
@@ -75,10 +75,10 @@ defmodule Jido.Workspace.Examples.IsolationProfilesTest do
         network: :host
       })
 
-      assert {:error, %Error{code: :invalid_input}} = Workspace.read(workspace, ctx.outside)
+      assert {:error, %Error{code: :invalid_input}} = Host.read(workspace, ctx.outside)
 
       assert {:ok, %Execution{exit_status: 0, output: output}} =
-               Workspace.run(workspace, ["/bin/cat", ctx.outside])
+               Host.run(workspace, ["/bin/cat", ctx.outside])
 
       assert output == ctx.fixture
     end)
@@ -106,7 +106,7 @@ defmodule Jido.Workspace.Examples.IsolationProfilesTest do
                 code: :runtime_unavailable,
                 operation: :open,
                 details: %{runtime: "runsc"}
-              }} = Workspace.open(profile: :gvisor, from: ctx.snapshot)
+              }} = Host.open(profile: :gvisor, from: ctx.snapshot)
 
       assert File.ls!(sandbox_roots) == []
     end
@@ -122,7 +122,7 @@ defmodule Jido.Workspace.Examples.IsolationProfilesTest do
               code: :unsupported_capability,
               operation: :open,
               details: %{capability: :isolation}
-            }} = Workspace.open(profile: :wrong_runtime, from: snapshot)
+            }} = Host.open(profile: :wrong_runtime, from: snapshot)
   end
 
   if System.get_env("JIDO_SANDBOX_DOCKER") != "1" do
@@ -141,22 +141,22 @@ defmodule Jido.Workspace.Examples.IsolationProfilesTest do
 
       assert File.read!(attempts) == "runsc\n"
       assert containers(sandbox) == []
-      assert {:ok, %{phase: :ready}} = Workspace.info(workspace)
-      assert :ok = Workspace.write(workspace, "notes.txt", "The required runtime failed.")
-      assert {:ok, %{kind: "snapshot"}} = Workspace.save(workspace)
+      assert {:ok, %{phase: :ready}} = Host.info(workspace)
+      assert :ok = Host.write(workspace, "notes.txt", "The required runtime failed.")
+      assert {:ok, %{kind: "snapshot"}} = Host.save(workspace)
     end)
   end
 
   defp check_report(workspace, tool, ctx, expected) do
-    assert {:ok, %{capabilities: capabilities}} = Workspace.info(workspace)
+    assert {:ok, %{capabilities: capabilities}} = Host.info(workspace)
     assert Map.take(capabilities, Map.keys(expected)) == expected
     assert {:ok, @report} = ReadWithApprovedTool.read(workspace, tool, @path)
-    assert Workspace.save(workspace) == {:ok, ctx.snapshot}
+    assert Host.save(workspace) == {:ok, ctx.snapshot}
   end
 
   defp check_fixture_hidden(workspace, ctx) do
     assert {:ok, %Execution{status: :exited, exit_status: code, output: output}} =
-             Workspace.run(workspace, ["cat", ctx.outside])
+             Host.run(workspace, ["cat", ctx.outside])
 
     assert code != 0
     refute output =~ ctx.fixture
@@ -221,12 +221,12 @@ defmodule Jido.Workspace.Examples.IsolationProfilesTest do
   end
 
   defp with_workspace(opts, fun) do
-    assert {:ok, workspace} = Workspace.open(opts)
+    assert {:ok, workspace} = Host.open(opts)
 
     try do
       fun.(workspace)
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 end

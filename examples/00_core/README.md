@@ -1,7 +1,7 @@
-# 00 Core Workspace API
+# 00 Core Realm API
 
 Use a report to follow the file, command, policy, and restore operations.
-Memory and Docker use `Jido.Workspace`. The host selects a named profile
+Memory and Docker use `Jido.Realm.Host`. The host selects a named profile
 when it opens a workspace.
 
 1. [Work on one tree](00_01_work_on_one_tree/README.md)

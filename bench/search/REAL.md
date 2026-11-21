@@ -1,6 +1,6 @@
 # Real source-tree search
 
-Run from the `jido_workspace` project root:
+Run from the `jido_realm` project root:
 
 ```sh
 mix run bench/search/real.exs

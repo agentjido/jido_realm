@@ -1,8 +1,8 @@
-defmodule Jido.Workspace.CommandFilesTest do
+defmodule Jido.Realm.Host.CommandFilesTest do
   use ExUnit.Case, async: false
   @moduletag :integration
-  alias Jido.Workspace
-  alias Jido.Workspace.Sandbox
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.Sandbox
 
   test "Sandbox checks a directory revision before it starts a command or service" do
     {:ok, sandbox} = Sandbox.open()
@@ -31,21 +31,21 @@ defmodule Jido.Workspace.CommandFilesTest do
   end
 
   test "memory and Sandbox files remain distinct, with explicit evidence" do
-    {:ok, workspace} = Workspace.open()
+    {:ok, workspace} = Host.open()
     {:ok, sandbox} = Sandbox.open()
 
     on_exit(fn ->
-      Workspace.close(workspace)
+      Host.close(workspace)
       Sandbox.destroy(sandbox)
     end)
 
-    :ok = Workspace.write(workspace, "/input", "memory")
+    :ok = Host.write(workspace, "/input", "memory")
     :ok = Sandbox.write(sandbox, "input", "disk")
-    {:ok, memory} = Workspace.file_view(workspace)
+    {:ok, memory} = Host.file_view(workspace)
     {:ok, disk} = Sandbox.file_view(sandbox)
 
     assert {:ok, %{output: "memory", files: ^memory}} =
-             Workspace.run(workspace, "cat /input", files: memory)
+             Host.run(workspace, "cat /input", files: memory)
 
     assert {:ok, %{output: "disk", files: ^disk}} =
              Sandbox.exec(sandbox, "/bin/cat", ["input"], files: disk)

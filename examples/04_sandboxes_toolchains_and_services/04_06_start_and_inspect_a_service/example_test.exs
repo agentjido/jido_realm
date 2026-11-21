@@ -1,13 +1,13 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 
-defmodule Jido.Workspace.Examples.ServiceTest do
+defmodule Jido.Realm.Host.Examples.ServiceTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution}
-  import Jido.Workspace.Examples.LifecycleSupport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution}
+  import Jido.Realm.Host.Examples.LifecycleSupport
 
   @port 8080
   @report "reviewed report\n"
@@ -16,10 +16,10 @@ defmodule Jido.Workspace.Examples.ServiceTest do
 
   setup %{tmp_dir: root} do
     configure(Path.join(root, "snapshots"))
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
 
     Application.put_env(
-      :jido_workspace,
+      :jido_realm,
       :profiles,
       Map.merge(profiles, %{
         service: Map.merge(profiles.docker, %{tools: ["/bin/sh"], service: @profile}),
@@ -33,18 +33,18 @@ defmodule Jido.Workspace.Examples.ServiceTest do
   end
 
   test "a memory workspace has no service ports and profile validation refuses a writable connector" do
-    assert {:error, %Error{code: :invalid_profile}} = Workspace.open(profile: :memory_service)
-    assert {:error, %Error{code: :invalid_profile}} = Workspace.open(profile: :invalid_connector)
-    assert {:ok, workspace} = Workspace.open(profile: :memory)
+    assert {:error, %Error{code: :invalid_profile}} = Host.open(profile: :memory_service)
+    assert {:error, %Error{code: :invalid_profile}} = Host.open(profile: :invalid_connector)
+    assert {:ok, workspace} = Host.open(profile: :memory)
 
     try do
       assert {:error,
               %Error{code: :unsupported_capability, details: %{capability: :service_ports}}} =
-               Workspace.connect(workspace, "execution-unused", @port)
+               Host.connect(workspace, "execution-unused", @port)
 
-      assert {:ok, %Execution{exit_status: 0}} = Workspace.run(workspace, ["echo", "ok"])
+      assert {:ok, %Execution{exit_status: 0}} = Host.run(workspace, ["echo", "ok"])
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 
@@ -55,15 +55,15 @@ defmodule Jido.Workspace.Examples.ServiceTest do
   test "a Docker service accepts reconnects on an approved port and stops before save" do
     with_service(fn workspace, sandbox, run, id ->
       assert {:ok, %{capabilities: %{network: :disabled, service_ports: [@port]}}} =
-               Workspace.info(workspace)
+               Host.info(workspace)
 
       assert {:error, %Error{code: :policy_denied, details: %{action: :connect}}} =
-               Workspace.connect(workspace, id, @port + 1)
+               Host.connect(workspace, id, @port + 1)
 
-      assert {:error, %Error{code: :invalid_input}} = Workspace.connect(workspace, id, 0)
+      assert {:error, %Error{code: :invalid_input}} = Host.connect(workspace, id, 0)
 
       assert {:error, %Error{code: :execution_not_active}} =
-               Workspace.connect(workspace, "execution-unused", @port)
+               Host.connect(workspace, "execution-unused", @port)
 
       first = connect(workspace, id)
       assert {:ok, @report} = exchange(first, "report\n")
@@ -78,23 +78,23 @@ defmodule Jido.Workspace.Examples.ServiceTest do
       format = "{{.HostConfig.NetworkMode}} {{len .HostConfig.PortBindings}}"
       assert {"none 0\n", 0} = docker(["inspect", "--format", format, container])
 
-      assert {:error, %Error{code: :busy}} = Workspace.save(workspace)
-      assert {:error, %Error{code: :busy}} = Workspace.write(workspace, "review", "pending")
-      assert :ok = Workspace.cancel(workspace, id)
+      assert {:error, %Error{code: :busy}} = Host.save(workspace)
+      assert {:error, %Error{code: :busy}} = Host.write(workspace, "review", "pending")
+      assert :ok = Host.cancel(workspace, id)
       assert {:ok, %Execution{id: ^id, status: :cancelled}} = Task.await(run, @wait)
       assert_receive {^second, {:exit_status, _}}, @wait
       assert containers(sandbox) == []
 
       assert {:error, %Error{code: :execution_not_active}} =
-               Workspace.connect(workspace, id, @port)
+               Host.connect(workspace, id, @port)
 
-      assert {:ok, snapshot} = Workspace.save(workspace)
-      assert {:ok, restored} = Workspace.open(profile: :memory, from: snapshot)
+      assert {:ok, snapshot} = Host.save(workspace)
+      assert {:ok, restored} = Host.open(profile: :memory, from: snapshot)
 
       try do
-        assert {:ok, @report} = Workspace.read(restored, "site/report.txt")
+        assert {:ok, @report} = Host.read(restored, "site/report.txt")
       after
-        assert :ok = Workspace.close(restored)
+        assert :ok = Host.close(restored)
       end
     end)
   end
@@ -108,7 +108,7 @@ defmodule Jido.Workspace.Examples.ServiceTest do
       connection = connect(workspace, id)
       assert {:ok, @report} = exchange(connection, "report\n")
 
-      assert :ok = Workspace.close(workspace, timeout_ms: @wait)
+      assert :ok = Host.close(workspace, timeout_ms: @wait)
       assert {:ok, %Execution{id: ^id, status: :cancelled}} = Task.await(run, @wait)
       assert_receive {^connection, {:exit_status, _}}, @wait
       assert containers(sandbox) == []
@@ -117,25 +117,25 @@ defmodule Jido.Workspace.Examples.ServiceTest do
   end
 
   defp with_service(fun) do
-    assert {:ok, workspace} = Workspace.open(profile: :service)
+    assert {:ok, workspace} = Host.open(profile: :service)
     {_, sandbox} = provider(workspace, :native)
     clean_up_docker_on_failure(sandbox)
 
     try do
-      assert :ok = Workspace.mkdir(workspace, "site")
+      assert :ok = Host.mkdir(workspace, "site")
 
       assert :ok =
-               Workspace.write(
+               Host.write(
                  workspace,
                  "site/service.sh",
                  File.read!(Path.join(__DIR__, "service.sh"))
                )
 
-      assert :ok = Workspace.write(workspace, "site/report.txt", @report)
+      assert :ok = Host.write(workspace, "site/report.txt", @report)
 
       run =
         Task.async(fn ->
-          Workspace.run(workspace, ["/bin/sh", "service.sh", Integer.to_string(@port)],
+          Host.run(workspace, ["/bin/sh", "service.sh", Integer.to_string(@port)],
             cwd: "site",
             timeout_ms: 20_000
           )
@@ -144,7 +144,7 @@ defmodule Jido.Workspace.Examples.ServiceTest do
       id =
         await(
           fn ->
-            {:ok, %{active_execution_id: id}} = Workspace.info(workspace)
+            {:ok, %{active_execution_id: id}} = Host.info(workspace)
             id
           end,
           "Workspace did not admit the service",
@@ -153,14 +153,14 @@ defmodule Jido.Workspace.Examples.ServiceTest do
 
       fun.(workspace, sandbox, run, id)
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 
   defp connect(workspace, id) do
     await(
       fn ->
-        case Workspace.connect(workspace, id, @port) do
+        case Host.connect(workspace, id, @port) do
           {:ok, connection} ->
             case line(connection, "", System.monotonic_time(:millisecond) + 1_000) do
               {:ok, "ready\n"} ->

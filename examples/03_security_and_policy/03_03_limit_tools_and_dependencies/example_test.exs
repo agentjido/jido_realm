@@ -1,16 +1,16 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.ReadWithApprovedToolTest do
+defmodule Jido.Realm.Host.Examples.ReadWithApprovedToolTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution, Info}
-  alias Jido.Workspace.Examples.ReadWithApprovedTool
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution, Info}
+  alias Jido.Realm.Host.Examples.ReadWithApprovedTool
 
-  import Jido.Workspace.Examples.LifecycleSupport,
+  import Jido.Realm.Host.Examples.LifecycleSupport,
     only: [clean_up_docker_on_failure: 1, configure: 1, containers: 1, provider: 2]
 
   @path "report.txt"
@@ -35,7 +35,7 @@ defmodule Jido.Workspace.Examples.ReadWithApprovedToolTest do
     put_profile(:memory, ["cat", @missing])
 
     assert {:error, %Error{code: :invalid_profile, operation: :open}} =
-             Workspace.open(profile: :review)
+             Host.open(profile: :review)
   end
 
   if System.get_env("JIDO_SANDBOX_DOCKER") != "1" do
@@ -54,13 +54,13 @@ defmodule Jido.Workspace.Examples.ReadWithApprovedToolTest do
 
       assert is_binary(id)
       assert containers(sandbox) == []
-      assert {:ok, %Info{phase: :ready, active_execution_id: nil}} = Workspace.info(workspace)
-      assert :ok = Workspace.write(workspace, @path, @report)
-      assert {:ok, %{kind: "snapshot"}} = Workspace.save(workspace)
+      assert {:ok, %Info{phase: :ready, active_execution_id: nil}} = Host.info(workspace)
+      assert :ok = Host.write(workspace, @path, @report)
+      assert {:ok, %{kind: "snapshot"}} = Host.save(workspace)
       assert {:ok, @report} = ReadWithApprovedTool.read(workspace, "cat", @path)
 
       assert {:ok, %Execution{status: :exited, exit_status: 127}} =
-               Workspace.run(workspace, ["sh", "-c", "exit 127"])
+               Host.run(workspace, ["sh", "-c", "exit 127"])
     end)
   end
 
@@ -79,15 +79,15 @@ defmodule Jido.Workspace.Examples.ReadWithApprovedToolTest do
 
         try do
           assert {:error, %Error{code: :quiescence_unknown}} =
-                   Workspace.run(workspace, [@missing])
+                   Host.run(workspace, [@missing])
 
           assert [_] = containers(sandbox)
-          assert {:ok, %Info{phase: :quiescence_unknown}} = Workspace.info(workspace)
+          assert {:ok, %Info{phase: :quiescence_unknown}} = Host.info(workspace)
 
           assert {:error, %Error{code: :quiescence_unknown}} =
-                   Workspace.write(workspace, @path, @report)
+                   Host.write(workspace, @path, @report)
 
-          assert {:error, %Error{code: :quiescence_unknown}} = Workspace.save(workspace)
+          assert {:error, %Error{code: :quiescence_unknown}} = Host.save(workspace)
           sandbox
         after
           File.rm!(hold)
@@ -101,7 +101,7 @@ defmodule Jido.Workspace.Examples.ReadWithApprovedToolTest do
     put_profile(provider, ["cat"])
 
     with_workspace(fn workspace ->
-      assert :ok = Workspace.write(workspace, @path, @report)
+      assert :ok = Host.write(workspace, @path, @report)
       assert {:ok, @report} = ReadWithApprovedTool.read(workspace, "cat", @path)
 
       for tool <- ["pwd", "sh", "/bin/cat", @missing] do
@@ -119,21 +119,21 @@ defmodule Jido.Workspace.Examples.ReadWithApprovedToolTest do
                   result: %Error{code: :policy_denied, operation: :run}
                 }
               }} =
-               Workspace.batch(workspace, [
+               Host.batch(workspace, [
                  {:write, "draft.txt", "Draft"},
                  {:run, ["pwd"], []},
                  {:write, "unreached.txt", "Unreached"}
                ])
 
-      assert {:ok, "Draft"} = Workspace.read(workspace, "draft.txt")
-      assert {:error, %Error{code: :not_found}} = Workspace.read(workspace, "unreached.txt")
+      assert {:ok, "Draft"} = Host.read(workspace, "draft.txt")
+      assert {:error, %Error{code: :not_found}} = Host.read(workspace, "unreached.txt")
     end)
   end
 
   defp put_profile(provider, tools) do
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
     profile = profiles |> Map.fetch!(provider) |> Map.put(:tools, tools)
-    Application.put_env(:jido_workspace, :profiles, Map.put(profiles, :review, profile))
+    Application.put_env(:jido_realm, :profiles, Map.put(profiles, :review, profile))
   end
 
   defp hold_removal(root) do
@@ -163,12 +163,12 @@ defmodule Jido.Workspace.Examples.ReadWithApprovedToolTest do
   end
 
   defp with_workspace(fun) do
-    assert {:ok, workspace} = Workspace.open(profile: :review)
+    assert {:ok, workspace} = Host.open(profile: :review)
 
     try do
       fun.(workspace)
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 end

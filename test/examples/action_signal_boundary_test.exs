@@ -1,24 +1,24 @@
-defmodule Jido.Workspace.ActionSignalBoundaryTest do
+defmodule Jido.Realm.Host.ActionSignalBoundaryTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag capture_log: true
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Deploy, Sandbox}
-  alias Jido.Workspace.Deploy.{Artifact, Snapshot}
-  alias Jido.Workspace.TestSupport.{ActionBoundary, Actions, BoundaryAgent}
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Deploy, Sandbox}
+  alias Jido.Realm.Host.Deploy.{Artifact, Snapshot}
+  alias Jido.Realm.Host.TestSupport.{ActionBoundary, Actions, BoundaryAgent}
 
   setup do
     assert {:ok, _} = Application.ensure_all_started(:jido)
     start_supervised!({Jido, name: __MODULE__.Runtime})
     store = start_supervised!({Agent, fn -> %{} end})
-    {:ok, ws} = Workspace.open()
-    {:ok, restricted} = Workspace.open(policy: :read_only)
+    {:ok, ws} = Host.open()
+    {:ok, restricted} = Host.open(policy: :read_only)
     {:ok, sandbox} = Sandbox.open()
 
     on_exit(fn ->
-      Workspace.close(ws)
-      Workspace.close(restricted)
+      Host.close(ws)
+      Host.close(restricted)
       Sandbox.destroy(sandbox)
     end)
 
@@ -60,43 +60,43 @@ defmodule Jido.Workspace.ActionSignalBoundaryTest do
                max_attempts: 1
              )
 
-    assert {:ok, "first"} = Workspace.read(ctx.ws, "/input")
+    assert {:ok, "first"} = Host.read(ctx.ws, "/input")
 
     assert %{result: %{content: "first"}} =
-             request(ctx, "workspace.read", %{path: "/input"})
+             request(ctx, "read", %{path: "/input"})
 
-    {:ok, view} = Workspace.file_view(ctx.ws)
+    {:ok, view} = Host.file_view(ctx.ws)
     view_ref = ActionBoundary.put(ctx.access.store, "draft", :file_view, view)
 
     assert %{result: %{output: "first", checked_files: true}} =
-             request(ctx, "workspace.run", %{command: "cat /input", file_view_ref: view_ref})
+             request(ctx, "run", %{command: "cat /input", file_view_ref: view_ref})
 
-    saved = request(ctx, "workspace.capture", %{}).result
-    request(ctx, "workspace.write", %{path: "/input", content: "second"})
+    saved = request(ctx, "capture", %{}).result
+    request(ctx, "write", %{path: "/input", content: "second"})
 
     assert %{error: %{code: "stale_file_view"}} =
              request(
                ctx,
-               "workspace.run",
+               "run",
                %{command: "write /marker bad", file_view_ref: view_ref},
                "draft",
                "failed"
              )
 
-    assert {:error, %Jido.Workspace.Error{code: :not_found}} = Workspace.read(ctx.ws, "/marker")
+    assert {:error, %Jido.Realm.Host.Error{code: :not_found}} = Host.read(ctx.ws, "/marker")
 
     assert %{error: %{code: "stale_revision"}} =
-             request(ctx, "workspace.replace", saved, "draft", "failed")
+             request(ctx, "replace", saved, "draft", "failed")
 
-    assert {:ok, "second"} = Workspace.read(ctx.ws, "/input")
-    current = request(ctx, "workspace.capture", %{}).result
+    assert {:ok, "second"} = Host.read(ctx.ws, "/input")
+    current = request(ctx, "capture", %{}).result
 
     assert %{result: %{revision_ref: _}} =
-             request(ctx, "workspace.replace", %{saved | revision_ref: current.revision_ref})
+             request(ctx, "replace", %{saved | revision_ref: current.revision_ref})
 
-    assert {:ok, "first"} = Workspace.read(ctx.ws, "/input")
+    assert {:ok, "first"} = Host.read(ctx.ws, "/input")
     {:ok, capture} = ActionBoundary.fetch(ctx.access.store, "draft", :capture, saved.capture_ref)
-    :ok = Workspace.close(ctx.ws)
+    :ok = Host.close(ctx.ws)
     assert {:ok, "first"} = Jido.VFS.read(capture, "input")
     refute_receive {:signal, _}
   end
@@ -105,19 +105,19 @@ defmodule Jido.Workspace.ActionSignalBoundaryTest do
     assert %{error: %{code: "policy_denied", operation: "write"}} =
              request(
                ctx,
-               "workspace.write",
+               "write",
                %{path: "/blocked", content: "bad"},
                "readonly",
                "failed"
              )
 
-    assert {:error, %Jido.Workspace.Error{code: :not_found}} =
-             Workspace.read(ctx.restricted, "/blocked")
+    assert {:error, %Jido.Realm.Host.Error{code: :not_found}} =
+             Host.read(ctx.restricted, "/blocked")
 
     assert %{error: %{code: "resource_not_found"}} =
              request(
                ctx,
-               "workspace.write",
+               "write",
                %{path: "/blocked", content: "bad"},
                "unknown",
                "failed"
@@ -131,19 +131,19 @@ defmodule Jido.Workspace.ActionSignalBoundaryTest do
                max_attempts: 1
              )
 
-    assert {:error, %Jido.Workspace.Error{code: :not_found}} = Workspace.read(ctx.ws, "/blocked")
+    assert {:error, %Jido.Realm.Host.Error{code: :not_found}} = Host.read(ctx.ws, "/blocked")
 
-    saved = request(ctx, "workspace.capture", %{}).result
+    saved = request(ctx, "capture", %{}).result
 
     assert %{error: %{code: "resource_not_found"}} =
-             request(ctx, "workspace.replace", saved, "readonly", "failed")
+             request(ctx, "replace", saved, "readonly", "failed")
 
     refute_receive {:signal, _}
   end
 
   test "Agent Signals run a local command and deploy the captured workspace bytes", ctx do
-    request(ctx, "workspace.write", %{path: "/index.txt", content: "accepted bytes"})
-    {:ok, bytes} = Workspace.read(ctx.ws, "/index.txt")
+    request(ctx, "write", %{path: "/index.txt", content: "accepted bytes"})
+    {:ok, bytes} = Host.read(ctx.ws, "/index.txt")
     :ok = Sandbox.write(ctx.sandbox, "input.txt", bytes)
 
     assert %{result: %{output: "accepted bytes", exit_status: 0}} =
@@ -195,7 +195,7 @@ defmodule Jido.Workspace.ActionSignalBoundaryTest do
 
   defp request(ctx, operation, data, resource_id \\ "draft", outcome \\ "succeeded") do
     request_id = "request-#{System.unique_integer([:positive, :monotonic])}"
-    prefix = "jido.workspace.v1." <> operation
+    prefix = "realm.host.v1." <> operation
 
     signal =
       Jido.Signal.new!(

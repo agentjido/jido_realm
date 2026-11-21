@@ -1,13 +1,13 @@
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.PersistedReportTest do
+defmodule Jido.Realm.Host.Examples.PersistedReportTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
   @moduletag timeout: 60_000
 
-  alias Jido.Workspace.Error
-  alias Jido.Workspace.Examples.PersistedReport
+  alias Jido.Realm.Host.Error
+  alias Jido.Realm.Host.Examples.PersistedReport
 
   test "a fresh BEAM uses a JSON-decoded reference to restore bytes and an empty directory",
        %{tmp_dir: root} do
@@ -55,7 +55,7 @@ defmodule Jido.Workspace.Examples.PersistedReportTest do
       configure(peer, root)
 
       assert {:ok, _} =
-               :peer.call(peer, Application, :ensure_all_started, [:jido_workspace], 15_000)
+               :peer.call(peer, Application, :ensure_all_started, [:jido_realm], 15_000)
 
       :peer.call(peer, Code, :require_file, [Path.join(__DIR__, "example.ex")], 15_000)
       :peer.call(peer, PersistedReport, operation, args, 15_000)
@@ -76,11 +76,11 @@ defmodule Jido.Workspace.Examples.PersistedReportTest do
       }
     }
 
-    :ok = :peer.call(peer, Application, :put_env, [:jido_workspace, :profiles, profiles])
+    :ok = :peer.call(peer, Application, :put_env, [:jido_realm, :profiles, profiles])
 
     :ok =
       :peer.call(peer, Application, :put_env, [
-        :jido_workspace,
+        :jido_realm,
         :stores,
         %{"reports" => store(root)}
       ])

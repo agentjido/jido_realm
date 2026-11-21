@@ -1,7 +1,7 @@
-defmodule Jido.Workspace.Examples.VerifyCredential do
+defmodule Jido.Realm.Host.Examples.VerifyCredential do
   @moduledoc "Send a fixture credential to one approved command."
 
-  alias Jido.Workspace
+  alias Jido.Realm.Host
 
   @tool "/workspace/bin/verify"
 
@@ -19,10 +19,10 @@ defmodule Jido.Workspace.Examples.VerifyCredential do
   end
 
   def run(workspace) do
-    Workspace.run(workspace, [@tool], stdin: :pipe, timeout_ms: 20_000)
+    Host.run(workspace, [@tool], stdin: :pipe, timeout_ms: 20_000)
   end
 
   def submit(workspace, execution_id, credential) do
-    Workspace.input(workspace, execution_id, credential <> "\n")
+    Host.input(workspace, execution_id, credential <> "\n")
   end
 end

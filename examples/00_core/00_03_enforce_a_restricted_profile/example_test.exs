@@ -1,12 +1,12 @@
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.RestrictedReportTest do
+defmodule Jido.Realm.Host.Examples.RestrictedReportTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.Examples.RestrictedReport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.Examples.RestrictedReport
 
   setup %{tmp_dir: root} do
     author = %{provider: :memory, policy: :full_access, store: "reports"}
@@ -38,14 +38,14 @@ defmodule Jido.Workspace.Examples.RestrictedReportTest do
   end
 
   test "invalid profiles and unmet requirements refuse open" do
-    assert {:error, %Workspace.Error{code: :unknown_profile}} =
-             Workspace.open(profile: :missing)
+    assert {:error, %Host.Error{code: :unknown_profile}} =
+             Host.open(profile: :missing)
 
-    assert {:error, %Workspace.Error{code: :invalid_profile}} =
-             Workspace.open(profile: :invalid)
+    assert {:error, %Host.Error{code: :invalid_profile}} =
+             Host.open(profile: :invalid)
 
-    assert {:error, %Workspace.Error{code: :unsupported_capability}} =
-             Workspace.open(profile: :incompatible)
+    assert {:error, %Host.Error{code: :unsupported_capability}} =
+             Host.open(profile: :incompatible)
   end
 
   if System.get_env("JIDO_SANDBOX_DOCKER") != "1" do
@@ -66,55 +66,55 @@ defmodule Jido.Workspace.Examples.RestrictedReportTest do
     outside = Path.join(root, "outside.txt")
     File.write!(outside, "Outside fixture")
 
-    assert {:ok, workspace} = Workspace.open(profile: :docker, from: prepare_report())
+    assert {:ok, workspace} = Host.open(profile: :docker, from: prepare_report())
 
     try do
       assert {:ok, %{exit_status: 0, output: "Approved report"}} =
-               Workspace.run(workspace, ["cat", "report.txt"])
+               Host.run(workspace, ["cat", "report.txt"])
 
-      assert {:ok, %{exit_status: 1, output: output}} = Workspace.run(workspace, ["cat", outside])
+      assert {:ok, %{exit_status: 1, output: output}} = Host.run(workspace, ["cat", outside])
       refute output =~ "Outside fixture"
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 
   defp prepare_report do
-    assert {:ok, workspace} = Workspace.open(profile: :author)
+    assert {:ok, workspace} = Host.open(profile: :author)
 
     try do
-      assert :ok = Workspace.write(workspace, "report.txt", "Approved report")
-      assert {:ok, snapshot} = Workspace.save(workspace)
+      assert :ok = Host.write(workspace, "report.txt", "Approved report")
+      assert {:ok, snapshot} = Host.save(workspace)
       snapshot
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 
   defp verify_read_only(profile, snapshot) do
-    assert {:ok, workspace} = Workspace.open(profile: profile, from: snapshot)
+    assert {:ok, workspace} = Host.open(profile: profile, from: snapshot)
 
     try do
       assert %{
                read: {:ok, "Approved report"},
-               write: {:error, %Workspace.Error{code: :policy_denied, operation: :write}},
-               run: {:error, %Workspace.Error{code: :policy_denied, operation: :run}}
+               write: {:error, %Host.Error{code: :policy_denied, operation: :write}},
+               run: {:error, %Host.Error{code: :policy_denied, operation: :run}}
              } = RestrictedReport.check(workspace)
 
-      assert {:ok, "Approved report"} = Workspace.read(workspace, "report.txt")
+      assert {:ok, "Approved report"} = Host.read(workspace, "report.txt")
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 
   defp configure(key, value) do
-    previous = Application.fetch_env(:jido_workspace, key)
-    Application.put_env(:jido_workspace, key, value)
+    previous = Application.fetch_env(:jido_realm, key)
+    Application.put_env(:jido_realm, key, value)
 
     on_exit(fn ->
       case previous do
-        {:ok, value} -> Application.put_env(:jido_workspace, key, value)
-        :error -> Application.delete_env(:jido_workspace, key)
+        {:ok, value} -> Application.put_env(:jido_realm, key, value)
+        :error -> Application.delete_env(:jido_realm, key)
       end
     end)
   end

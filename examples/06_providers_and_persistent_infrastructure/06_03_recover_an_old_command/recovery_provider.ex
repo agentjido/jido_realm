@@ -1,6 +1,6 @@
-defmodule Jido.Workspace.Examples.RecoveryProvider do
+defmodule Jido.Realm.Host.Examples.RecoveryProvider do
   @moduledoc false
-  @behaviour Jido.Workspace.Provider
+  @behaviour Jido.Realm.Host.Provider
 
   @packet_limit 1_114_112
   @socket_options [:binary, active: false, packet: 4, packet_size: @packet_limit]

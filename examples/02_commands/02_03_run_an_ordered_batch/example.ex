@@ -1,7 +1,7 @@
-defmodule Jido.Workspace.Examples.PrepareReport do
+defmodule Jido.Realm.Host.Examples.PrepareReport do
   @moduledoc "Write a draft, check its inputs, and save a successful batch."
 
-  alias Jido.Workspace
+  alias Jido.Realm.Host
 
   def prepare(workspace, extra_inputs \\ []) do
     steps = [
@@ -11,8 +11,8 @@ defmodule Jido.Workspace.Examples.PrepareReport do
       {:write, "reports/checked.txt", "Inputs checked\n"}
     ]
 
-    case Workspace.batch(workspace, steps) do
-      {:ok, %{status: :completed}} -> Workspace.save(workspace)
+    case Host.batch(workspace, steps) do
+      {:ok, %{status: :completed}} -> Host.save(workspace)
       result -> result
     end
   end

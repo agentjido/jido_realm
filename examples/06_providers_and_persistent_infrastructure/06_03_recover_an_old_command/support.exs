@@ -3,19 +3,19 @@ Code.require_file("../06_02_reuse_or_request_a_machine/machine_provider.ex", __D
 Code.require_file("recovery_provider.ex", __DIR__)
 Code.require_file("recovery_host.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.RecoverySupport do
+defmodule Jido.Realm.Host.Examples.RecoverySupport do
   @moduledoc false
 
   import ExUnit.Assertions
 
-  alias Jido.Workspace.{CommandRef, InfrastructureRef}
-  alias Jido.Workspace.Examples.{MachinePool, RecoveryHost, RecoveryProvider}
+  alias Jido.Realm.Host.{CommandRef, InfrastructureRef}
+  alias Jido.Realm.Host.Examples.{MachinePool, RecoveryHost, RecoveryProvider}
 
   @provider_source Path.join(__DIR__, "recovery_provider.ex")
 
   def preserve_configuration do
-    profiles = Application.fetch_env(:jido_workspace, :profiles)
-    stores = Application.fetch_env(:jido_workspace, :stores)
+    profiles = Application.fetch_env(:jido_realm, :profiles)
+    stores = Application.fetch_env(:jido_realm, :stores)
 
     ExUnit.Callbacks.on_exit(fn ->
       restore_env(:profiles, profiles)
@@ -36,12 +36,12 @@ defmodule Jido.Workspace.Examples.RecoverySupport do
       if Process.alive?(peer), do: :peer.stop(peer)
     end)
 
-    assert {:ok, _} = :peer.call(peer, Application, :ensure_all_started, [:jido_workspace])
+    assert {:ok, _} = :peer.call(peer, Application, :ensure_all_started, [:jido_realm])
     assert is_list(:peer.call(peer, Code, :require_file, [@provider_source]))
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
-    stores = Application.fetch_env!(:jido_workspace, :stores)
-    assert :ok = :peer.call(peer, Application, :put_env, [:jido_workspace, :profiles, profiles])
-    assert :ok = :peer.call(peer, Application, :put_env, [:jido_workspace, :stores, stores])
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
+    stores = Application.fetch_env!(:jido_realm, :stores)
+    assert :ok = :peer.call(peer, Application, :put_env, [:jido_realm, :profiles, profiles])
+    assert :ok = :peer.call(peer, Application, :put_env, [:jido_realm, :stores, stores])
     peer
   end
 
@@ -76,14 +76,14 @@ defmodule Jido.Workspace.Examples.RecoverySupport do
     host = ExUnit.Callbacks.start_supervised!({RecoveryHost, {pool, machine}})
     options = RecoveryHost.options(host)
 
-    Application.put_env(:jido_workspace, :profiles, %{
+    Application.put_env(:jido_realm, :profiles, %{
       run: profile(options, [:read, :write, :execute, :save]),
       lost_reply: profile(Map.put(options, :lose_reply, true), [:read, :write, :execute, :save]),
       recovery: profile(options, [:recover]),
       memory: %{provider: :memory, policy: :full_access, store: "results"}
     })
 
-    Application.put_env(:jido_workspace, :stores, %{"results" => Path.join(root, "results")})
+    Application.put_env(:jido_realm, :stores, %{"results" => Path.join(root, "results")})
     %{pool: pool, host: host, machine: machine, tree: MachinePool.tree(pool, machine)}
   end
 
@@ -108,6 +108,6 @@ defmodule Jido.Workspace.Examples.RecoverySupport do
     ref
   end
 
-  defp restore_env(key, {:ok, value}), do: Application.put_env(:jido_workspace, key, value)
-  defp restore_env(key, :error), do: Application.delete_env(:jido_workspace, key)
+  defp restore_env(key, {:ok, value}), do: Application.put_env(:jido_realm, key, value)
+  defp restore_env(key, :error), do: Application.delete_env(:jido_realm, key)
 end

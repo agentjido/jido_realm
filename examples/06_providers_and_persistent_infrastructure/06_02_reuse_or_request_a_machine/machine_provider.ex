@@ -1,11 +1,11 @@
-defmodule Jido.Workspace.Examples.MachineProvider do
+defmodule Jido.Realm.Host.Examples.MachineProvider do
   @moduledoc false
-  @behaviour Jido.Workspace.Provider
+  @behaviour Jido.Realm.Host.Provider
 
   alias Jido.VFS.Capture
-  alias Jido.Workspace.{Provider, Schemas}
-  alias Jido.Workspace.Examples.MachinePool
-  alias Jido.Workspace.Sandbox.Files
+  alias Jido.Realm.Host.{Provider, Schemas}
+  alias Jido.Realm.Host.Examples.MachinePool
+  alias Jido.Realm.Host.Sandbox.Files
 
   @max_command_bytes 1_048_576
 

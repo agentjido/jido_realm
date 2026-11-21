@@ -1,16 +1,16 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.NetworkProbeTest do
+defmodule Jido.Realm.Host.Examples.NetworkProbeTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution, Sandbox}
-  alias Jido.Workspace.Examples.NetworkProbe
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution, Sandbox}
+  alias Jido.Realm.Host.Examples.NetworkProbe
 
-  import Jido.Workspace.Examples.LifecycleSupport,
+  import Jido.Realm.Host.Examples.LifecycleSupport,
     only: [
       await: 3,
       clean_up_docker_on_failure: 1,
@@ -40,7 +40,7 @@ defmodule Jido.Workspace.Examples.NetworkProbeTest do
     configure_profile(:memory, %{require: %{network: :host}})
 
     assert {:error, %Error{code: :invalid_profile, operation: :open}} =
-             Workspace.open(profile: :memory)
+             Host.open(profile: :memory)
   end
 
   if System.get_env("JIDO_SANDBOX_DOCKER") != "1" do
@@ -67,7 +67,7 @@ defmodule Jido.Workspace.Examples.NetworkProbeTest do
                docker(["inspect", "--format", "{{.HostConfig.NetworkMode}}", container])
 
       check_local_report(workspace)
-      assert {:ok, %{kind: "snapshot"}} = Workspace.save(workspace)
+      assert {:ok, %{kind: "snapshot"}} = Host.save(workspace)
       assert {@body, 0} = connected_request(network, image, url)
     end)
   end
@@ -172,25 +172,25 @@ defmodule Jido.Workspace.Examples.NetworkProbeTest do
   defp endpoint_url(address), do: "http://#{address}:#{@port}/fixture.txt"
 
   defp check_local_report(workspace) do
-    assert :ok = Workspace.write(workspace, "report.txt", "Local report")
+    assert :ok = Host.write(workspace, "report.txt", "Local report")
 
     assert {:ok, %Execution{exit_status: 0, output: "Local report"}} =
-             Workspace.run(workspace, ["cat", "report.txt"])
+             Host.run(workspace, ["cat", "report.txt"])
   end
 
   defp configure_profile(name, attrs) do
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
     profile = profiles |> Map.fetch!(name) |> Map.merge(attrs)
-    Application.put_env(:jido_workspace, :profiles, Map.put(profiles, name, profile))
+    Application.put_env(:jido_realm, :profiles, Map.put(profiles, name, profile))
   end
 
   defp with_workspace(profile, fun) do
-    assert {:ok, workspace} = Workspace.open(profile: profile)
+    assert {:ok, workspace} = Host.open(profile: profile)
 
     try do
       fun.(workspace)
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 end

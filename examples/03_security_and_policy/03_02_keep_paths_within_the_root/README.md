@@ -5,19 +5,19 @@ same calls work on memory and Docker when the host supplies the named
 profiles from the [examples guide](../../README.md#save-and-reopen-after-a-beam-restart).
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
-{:ok, workspace} = Workspace.open(profile: :memory)
-:ok = Workspace.write(workspace, "reports/-report.txt", "Workspace report\n")
-{:ok, "Workspace report\n"} = Workspace.read(workspace, "reports/-report.txt")
+{:ok, workspace} = Host.open(profile: :memory)
+:ok = Host.write(workspace, "reports/-report.txt", "Realm report\n")
+{:ok, "Realm report\n"} = Host.read(workspace, "reports/-report.txt")
 
-{:ok, %{exit_status: 0, output: "Workspace report\n"}} =
-  Workspace.run(workspace, ["cat", "./-report.txt"], cwd: "reports")
+{:ok, %{exit_status: 0, output: "Realm report\n"}} =
+  Host.run(workspace, ["cat", "./-report.txt"], cwd: "reports")
 
-{:error, %Workspace.Error{code: :invalid_input}} =
-  Workspace.write(workspace, "../report.txt", "Rejected")
+{:error, %Host.Error{code: :invalid_input}} =
+  Host.write(workspace, "../report.txt", "Rejected")
 
-:ok = Workspace.close(workspace)
+:ok = Host.close(workspace)
 ```
 
 The `./` prefix in the command argument identifies the file even though its
@@ -35,17 +35,17 @@ name starts with a hyphen. The selected tool interprets each argument.
 ## Docker fixture
 
 The test creates a host file outside a temporary checkout. It supplies a
-file link and a directory link inside the checkout. Workspace refuses file
+file link and a directory link inside the checkout. Realm refuses file
 calls through the links. A native command that reads through either link
 exits with a nonzero status inside the container. An approved command removes
-the links, then Workspace can save the remaining tree and reopen it in memory.
+the links, then Realm can save the remaining tree and reopen it in memory.
 
 A hard link supplied by the host is a regular entry in the checkout.
 Its existing bytes are readable. File writes replace the selected entry and
 preserve its read, write, and execute permission bits. File deletes remove
 only the selected name. The host
 chooses which files to share through the checkout and coordinates external
-edits while Workspace holds it. Native commands use container filesystem
+edits while Realm holds it. Native commands use container filesystem
 semantics, including the image's own files and the shared checkout.
 
 ```sh

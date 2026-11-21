@@ -1,18 +1,18 @@
-# Workspace API proposal
+# Realm API proposal
 
 This document records an earlier design. See the
-[Workspace guides](docs/guides/table_of_contents.md) for the current API.
+[Realm guides](docs/guides/table_of_contents.md) for the current API.
 
-Status: Workspace contracts and the first Sandbox backend increment are implemented.
+Status: Realm contracts and the first Sandbox backend increment are implemented.
 Remaining Sandbox, Policy, Deploy, and production Action/Signal contracts remain proposed.
 This package is unreleased. Update the existing API and its callers directly.
 No versioned facade or compatibility layer is required.
 
 ## Implemented scope
 
-`Jido.Workspace` uses `:ok` for write, mkdir, delete, stop_session, and close.
-All Workspace methods return `Jido.Workspace.Error` on failure.
-Its `resource` field is the Workspace ID.
+`Jido.Realm.Host` uses `:ok` for write, mkdir, delete, stop_session, and close.
+All Realm methods return `Jido.Realm.Host.Error` on failure.
+Its `resource` field is the Realm ID.
 The bounded cause is diagnostic text, not a second machine-readable contract.
 
 The existing controller owns storage, resource lifetime, and policy. Keep the
@@ -34,19 +34,19 @@ segment in Signal types identifies the message schema, not a separate API.
 
 | Boundary | Owns | Does not own |
 | --- | --- | --- |
-| Workspace | Working files, VFS mounts, virtual Shell session, capture checks | Source history, OS services |
+| Realm | Working files, VFS mounts, virtual Shell session, capture checks | Source history, OS services |
 | Sandbox | Backend resource, execution, files, retained services | Source acceptance, deployment order |
 | Policy | Permission decisions at controller boundaries | Backend capability or OS isolation |
 | Deploy | Targets, ordered tasks, transition plans, operation evidence, recovery | Source history, build tools, acceptance |
 | Actions | Input schemas, resource resolution, calls to the public API | A second implementation of file or deployment rules |
 | Signals | Requests, correlation, progress, completion, failure | Permission grants or runtime handles |
 
-Keep VFS, Shell, and source history separate. Keep Workspace and Sandbox files
+Keep VFS, Shell, and source history separate. Keep Realm and Sandbox files
 separate. Transfer content explicitly. Loading a Studio project requires a root
 with `mix.exs`; this does not restrict SDK file types.
 
 The controller owns mutable state. Handles identify resources and remain stable.
-Workspace close stops its storage and Shell session. The default Workspace owner
+Realm close stops its storage and Shell session. The default Realm owner
 is the caller; owner exit closes it. Sandbox uses application ownership. Detach
 leaves its resources intact; destroy removes them. Controller shutdown stops
 local services. Remote lifetime guarantees must come from the selected backend.
@@ -79,7 +79,7 @@ These are proposed types. Runtime handles are opaque to callers.
 stdout and stderr through an optional output capability. Do not fabricate
 separate streams from the current local provider's combined stream.
 
-All paths use UTF-8. File bytes are binary. Workspace paths are absolute within
+All paths use UTF-8. File bytes are binary. Realm paths are absolute within
 VFS. Sandbox paths are relative to the resource root. Reject parent traversal,
 NUL, and unsupported links. No public portable operation requires a host path.
 Timeouts use milliseconds. Limits use bytes. Enforce output limits at collection.
@@ -89,11 +89,11 @@ Policy refusal, invalid input, unsupported operations, and failure to start retu
 `{:error, error}`. A command timeout returns an execution with `:timed_out`.
 An observation error after execution must not hide completed side effects.
 
-## 3. Workspace contract
+## 3. Realm contract
 
 ```elixir
-open(opts \\ [])                         # result(Workspace.t())
-info(ws)                                 # result(Workspace.Info.t())
+open(opts \\ [])                         # result(Host.t())
+info(ws)                                 # result(Host.Info.t())
 read(ws, path)                           # result(binary())
 list(ws, path \\ "/")                    # result([Entry.t()])
 write(ws, path, bytes)                    # mutation_result()
@@ -111,16 +111,16 @@ Preserve the memory adapter default and the current full-access default during
 migration. Agent hosts must select a policy explicitly.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
-{:ok, ws} = Workspace.open(policy: :workspace_write)
-:ok = Workspace.write(ws, "/input.txt", "first")
-{:ok, saved, _} = Workspace.capture(ws)
-:ok = Workspace.write(ws, "/input.txt", "second")
-{:ok, _current, revision} = Workspace.capture(ws)
-{:ok, _next} = Workspace.replace(ws, saved, expected: revision)
-{:ok, "first"} = Workspace.read(ws, "/input.txt")
-:ok = Workspace.close(ws)
+{:ok, ws} = Host.open(policy: :workspace_write)
+:ok = Host.write(ws, "/input.txt", "first")
+{:ok, saved, _} = Host.capture(ws)
+:ok = Host.write(ws, "/input.txt", "second")
+{:ok, _current, revision} = Host.capture(ws)
+{:ok, _next} = Host.replace(ws, saved, expected: revision)
+{:ok, "first"} = Host.read(ws, "/input.txt")
+:ok = Host.close(ws)
 ```
 
 `replace` checks the resource generation and revision atomically with replacement.
@@ -137,17 +137,17 @@ Retain `filesystem`, `shell`, `start_session`, and `stop_session` as advanced
 operations during migration. Raw handles require `:raw_handle` permission.
 Controller state supplies current session information; handles do not cache it.
 
-The implemented Workspace records are:
+The implemented Realm records are:
 
 ```elixir
-%Jido.Workspace.Info{id: id, policy: profile, owner: pid, session: :running | :stopped}
-%Jido.Workspace.Entry{path: absolute_path, kind: :file | :directory,
+%Jido.Realm.Host.Info{id: id, policy: profile, owner: pid, session: :running | :stopped}
+%Jido.Realm.Host.Entry{path: absolute_path, kind: :file | :directory,
                       mode: mode_or_nil, size: bytes_or_nil}
-%Jido.Workspace.FileView{kind: :workspace | :backend, owner: generation,
+%Jido.Realm.Host.FileView{kind: :workspace | :backend, owner: generation,
                          path: path, revision: revision | :unavailable}
 ```
 
-The shared FileView retains its existing fields for Sandbox. Its Workspace
+The shared FileView retains its existing fields for Sandbox. Its Realm
 owner is the controller PID; backend views identify the backend and session PID.
 Entry metadata that the VFS listing does not supply is `nil`.
 `Execution.after_files` is a FileView or `{:error, Error.t()}`. It does not hide
@@ -172,8 +172,8 @@ Use profiles and backend capabilities as in
 not a promise of API compatibility or a new runtime dependency.
 
 ```elixir
-alias Jido.Workspace.Sandbox
-alias Jido.Workspace.Sandbox.Backends.Local
+alias Jido.Realm.Host.Sandbox
+alias Jido.Realm.Host.Sandbox.Backends.Local
 
 {:ok, sandbox} = Sandbox.open(backend: {Local, []}, policy: :full_access)
 :ok = Sandbox.write(sandbox, "input.txt", "hello")
@@ -206,7 +206,7 @@ replace a profile's backend, resource identity, or permissions. Do not use a
 public mutable struct as authority.
 
 ```elixir
-config :jido_workspace, Jido.Workspace.Sandbox,
+config :jido_realm, Jido.Realm.Host.Sandbox,
   profiles: [local_dev: [backend: {Local, []}, policy: :full_access]]
 
 {:ok, sandbox} = Sandbox.open(profile: :local_dev)
@@ -220,7 +220,7 @@ The result types in the method list above remain the later target where they
 are different. This increment does not add profiles or production Actions.
 
 ```elixir
-alias Jido.Workspace.Sandbox.Backends.{Local, Docker}
+alias Jido.Realm.Host.Sandbox.Backends.{Local, Docker}
 
 {:ok, local} = Sandbox.open(backend: {Local, []})
 {:ok, box} = Sandbox.open(backend: {Docker, [image: "alpine:latest"]})
@@ -298,8 +298,8 @@ Errors for this increment retain Sandbox's existing `{:error, reason}` shape:
 | `{:docker, operation, :output_limit, output}` | Control response exceeds the buffer; effects can be uncertain |
 | `{:docker, operation, :timeout, output}` | Command deadline expired; effects can be uncertain |
 
-For a named Docker, gVisor, or Apple Container profile, `Workspace.open/1`
-reports an unavailable local image as `%Workspace.Error{code: :image_unavailable}`.
+For a named Docker, gVisor, or Apple Container profile, `Host.open/1`
+reports an unavailable local image as `%Host.Error{code: :image_unavailable}`.
 Apple Container also reports `:backend_unavailable` for an unsupported host,
 missing CLI, or unavailable service. [Apple Container profile](SANDBOX.md#apple-container)
 
@@ -426,16 +426,16 @@ Direct methods are canonical. Each Action validates parameters, resolves trusted
 resource references, calls one method, and maps the result. The controller still
 validates every operation. Actions must not copy policy or deployment logic.
 
-Proposed namespace: `Jido.Workspace.Actions` with `Workspace`, `Sandbox`, and
+Proposed namespace: `Jido.Realm.Host.Actions` with `Workspace`, `Sandbox`, and
 `Deploy` groups. Each operation has its own Action and schema. Example modules:
 
 | Action suffix | Parameters in addition to request/resource IDs | Result data |
 | --- | --- | --- |
-| `Workspace.Write` | path, content, encoding | path |
-| `Workspace.Read` | path | path, content, encoding |
-| `Workspace.Capture` | none | capture_ref, revision_ref |
-| `Workspace.Replace` | capture_ref, revision_ref | revision_ref |
-| `Workspace.Run` | command, optional file_view_ref | execution |
+| `Host.Write` | path, content, encoding | path |
+| `Host.Read` | path | path, content, encoding |
+| `Host.Capture` | none | capture_ref, revision_ref |
+| `Host.Replace` | capture_ref, revision_ref | revision_ref |
+| `Host.Run` | command, optional file_view_ref | execution |
 | `Sandbox.Exec` | executable, args, allowed command options | execution |
 | `Deploy.Prepare` | artifact_ref, recipe_ref, stage, roles | plan_ref, step summaries |
 | `Deploy.Apply` | plan_ref | operation_id |
@@ -449,7 +449,7 @@ They are not untrusted serialized Erlang terms.
 
 ```elixir
 {:ok, result} = Jido.Exec.run(
-  Jido.Workspace.Actions.Workspace.Write,
+  Jido.Realm.Host.Actions.Workspace.Write,
   %{request_id: "req-1", resource_id: "draft", path: "/input.txt",
     content: "hello", encoding: "utf8"},
   %{workspace_access: trusted_access},
@@ -467,7 +467,7 @@ requires access to that exact stored plan; it does not imply source acceptance.
 
 Actions run in executor tasks. The host must open resources under a persistent
 owner before passing references to Actions. Do not create a caller-owned
-Workspace in a short-lived Action task.
+Realm in a short-lived Action task.
 
 ## 8. Jido Signal boundary
 
@@ -475,25 +475,25 @@ Use versioned request names and explicit routes:
 
 ```elixir
 routes do
-  route "jido.workspace.v1.workspace.write.requested", Actions.Workspace.Write do
+  route "realm.host.v1.write.requested", Actions.Workspace.Write do
     state :unchanged
   end
 
-  route "jido.workspace.v1.sandbox.exec.requested", Actions.Sandbox.Exec do
+  route "realm.host.v1.sandbox.exec.requested", Actions.Sandbox.Exec do
     state :unchanged
   end
 
-  route "jido.workspace.v1.deploy.prepare.requested", Actions.Deploy.Prepare do
+  route "realm.host.v1.deploy.prepare.requested", Actions.Deploy.Prepare do
     state :unchanged
   end
 
-  route "jido.workspace.v1.deploy.apply.requested", Actions.Deploy.Apply do
+  route "realm.host.v1.deploy.apply.requested", Actions.Deploy.Apply do
     state :unchanged
   end
 end
 
 request = Jido.Signal.new!(
-  "jido.workspace.v1.workspace.write.requested",
+  "realm.host.v1.write.requested",
   %{request_id: "req-1", resource_id: "draft", path: "/input.txt",
     content: "hello", encoding: "utf8"},
   source: "/studio/agent/author"
@@ -513,7 +513,7 @@ full snapshots, or function values. Validation/routing refusals also require
 correlated failure replies from the adapter, before Action execution.
 
 Deploy apply success means the operation was accepted. Execution progress uses
-`jido.workspace.v1.deploy.operation.updated`, with operation ID, plan ID, step ID,
+`realm.host.v1.deploy.operation.updated`, with operation ID, plan ID, step ID,
 and status. A final update reports terminal status. Status queries remain the
 authority if a Signal is lost. Request IDs provide correlation only. Duplicate
 delivery does not make arbitrary commands safe to repeat. Disable automatic
@@ -546,7 +546,7 @@ values. Do not mark an uncertain operation as safe to retry.
 ## 10. Migration and acceptance
 
 1. Add this proposal and current-API integration evidence. No runtime API change.
-2. Update Workspace methods in place with shared results/errors. Update repo
+2. Update Realm methods in place with shared results/errors. Update repo
    callers and tests in the same change. Keep each method change small.
 3. Add Policy requests and controller checks. Preserve current preset behavior.
 4. Extract Local and add Docker behind the mounted-files backend contract. Run
@@ -602,7 +602,7 @@ checked replacement, file views, raw access, session stop/start, output limits,
 timeout cancellation, and nonzero exit output through all three boundaries.
 They also check explicit cancellation and final file observation failure.
 The nonzero case uses a test Shell backend that executes a real `/bin/sh`
-process. Other Workspace commands use the virtual Shell. Test replies use
+process. Other Realm commands use the virtual Shell. Test replies use
 resource-bound references for captures, revisions, file views, and raw handles.
 
 The test adapter supports UTF-8 text only and resolves pre-opened resources.
@@ -611,7 +611,7 @@ failure replies and production reference access remain future adapter work.
 The test Agent uses `exec_opts: [max_attempts: 1]` at startup. Direct Action
 calls also use `max_attempts: 1`. Each effectful call runs at most once.
 
-Run from `jido_workspace`:
+Run from `jido_realm`:
 
 ```sh
 mix test.integration

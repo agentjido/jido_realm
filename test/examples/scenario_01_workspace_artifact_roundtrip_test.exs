@@ -1,12 +1,12 @@
-defmodule Jido.Workspace.Integration.Scenario01WorkspaceArtifactRoundtripTest do
+defmodule Jido.Realm.Host.Integration.Scenario01WorkspaceArtifactRoundtripTest do
   use ExUnit.Case, async: false
 
   @moduledoc """
   Scenario 01 goal: Prove baseline artifact lifecycle works end to end in one integration scenario test.
   """
 
-  alias Jido.Workspace
-  alias Jido.Workspace.TestSupport.ScenarioHelpers
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.TestSupport.ScenarioHelpers
 
   @moduletag :integration
   @moduletag :local_integration
@@ -24,22 +24,22 @@ defmodule Jido.Workspace.Integration.Scenario01WorkspaceArtifactRoundtripTest do
     end)
 
     try do
-      :ok = Workspace.mkdir(workspace, "/artifacts")
+      :ok = Host.mkdir(workspace, "/artifacts")
       ScenarioHelpers.put_workspace(workspace)
 
-      :ok = Workspace.write(workspace, "/artifacts/hello.txt", "Hello, World!")
+      :ok = Host.write(workspace, "/artifacts/hello.txt", "Hello, World!")
       ScenarioHelpers.put_workspace(workspace)
 
-      assert {:ok, "Hello, World!"} = Workspace.read(workspace, "/artifacts/hello.txt")
+      assert {:ok, "Hello, World!"} = Host.read(workspace, "/artifacts/hello.txt")
 
-      assert {:ok, entries_before_delete} = Workspace.list(workspace, "/artifacts")
+      assert {:ok, entries_before_delete} = Host.list(workspace, "/artifacts")
       assert Enum.any?(entries_before_delete, &(&1.path == "/artifacts/hello.txt"))
 
-      :ok = Workspace.delete(workspace, "/artifacts/hello.txt")
+      :ok = Host.delete(workspace, "/artifacts/hello.txt")
       ScenarioHelpers.put_workspace(workspace)
 
-      assert {:error, %Jido.Workspace.Error{code: :not_found}} =
-               Workspace.read(workspace, "/artifacts/hello.txt")
+      assert {:error, %Jido.Realm.Host.Error{code: :not_found}} =
+               Host.read(workspace, "/artifacts/hello.txt")
 
       summary_json =
         ScenarioHelpers.summary_json(
@@ -49,7 +49,7 @@ defmodule Jido.Workspace.Integration.Scenario01WorkspaceArtifactRoundtripTest do
           [{"entries_before_delete", entries_before_delete}]
         )
 
-      :ok = Workspace.write(workspace, @summary_path, summary_json)
+      :ok = Host.write(workspace, @summary_path, summary_json)
       ScenarioHelpers.put_workspace(workspace)
 
       summary_file = Path.join(output_root, "artifacts/run_summary.json")

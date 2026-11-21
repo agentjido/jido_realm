@@ -1,18 +1,18 @@
 # 04.03 Supervise a native process
 
 Run an approved host tool with literal arguments and a working directory.
-Use the same `Workspace.run/3`, `Workspace.output/3`, and
-`Workspace.cancel/2` calls as the other command examples. The host
+Use the same `Host.run/3`, `Host.output/3`, and
+`Host.cancel/2` calls as the other command examples. The host
 selects the process runner in a named profile.
 
 ## Configure the host
 
 Add `{:erlexec, "~> 2.6"}` to the host application's dependencies.
-erlexec builds a native helper. Workspace uses the POSIX shell's
+erlexec builds a native helper. Realm uses the POSIX shell's
 `kill -0` to check the group. [erlexec installation and options](https://hexdocs.pm/erlexec/readme.html)
 
 ```elixir
-config :jido_workspace,
+config :jido_realm,
   profiles: %{
     native: %{
       provider: :local,
@@ -27,36 +27,36 @@ config :jido_workspace,
 ```
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
-{:ok, workspace} = Workspace.open(profile: :native)
+{:ok, workspace} = Host.open(profile: :native)
 try do
-  :ok = Workspace.mkdir(workspace, "build")
+  :ok = Host.mkdir(workspace, "build")
 
   {:ok, %{status: :exited, exit_status: 0, output: output}} =
-    Workspace.run(workspace, ["/bin/echo", "report; draft"], cwd: "build")
+    Host.run(workspace, ["/bin/echo", "report; draft"], cwd: "build")
 
-  :ok = Workspace.write(workspace, "build/report.txt", output)
-  {:ok, snapshot} = Workspace.save(workspace)
+  :ok = Host.write(workspace, "build/report.txt", output)
+  {:ok, snapshot} = Host.save(workspace)
   snapshot
 after
-  :ok = Workspace.close(workspace)
+  :ok = Host.close(workspace)
 end
 ```
 
 The requirement checks the reported cancellation capability at open.
 The default Port runner reports `:direct_child`. A profile that requires
-`:process_group` must select erlexec. If Workspace cannot start erlexec,
+`:process_group` must select erlexec. If Realm cannot start erlexec,
 open returns `:unsupported_capability`.
 
 ## Confirm that the group stopped
 
 erlexec starts each command in its own process group and sends signals
-to that group. Its exit report describes the leader. Workspace also
+to that group. Its exit report describes the leader. Realm also
 checks that the OS reports the group is gone before it accepts an exit
 or cancel result. A native process that ignores `SIGTERM` can survive
 its leader. If the check cannot confirm cleanup, run returns
-`:quiescence_unknown`, and Workspace blocks writes and saves. Close
+`:quiescence_unknown`, and Realm blocks writes and saves. Close
 can return `:cleanup_unconfirmed` and keep the directory. The host can
 stop the remaining process and retry close.
 
@@ -64,7 +64,7 @@ Use trusted tools that keep their writers in the original process group.
 Local tools run with the host user's file and network access. A process
 that starts a new session can leave the original group.
 The OS can report that a group still exists until it reaps its exited
-children. Workspace keeps the tree fenced while the group exists.
+children. Realm keeps the tree fenced while the group exists.
 
 ## Run the integration example
 
@@ -77,9 +77,9 @@ The tests check fast stdout and stderr delivery, literal arguments,
 working directory, and a nonzero exit status. A child announces that it
 is ready before the test cancels the command. The test checks the actual
 child PID before it saves the tree. A separate child ignores `SIGTERM`
-and proves that Workspace keeps the tree fenced until cleanup.
+and proves that Realm keeps the tree fenced until cleanup.
 [Integration tests](example_test.exs)
 
-The public Workspace tests ran on macOS. A separate runner check in a
+The public Realm tests ran on macOS. A separate runner check in a
 disposable Debian container confirmed fast output, exit status, and
 cleanup of a child in the process group.

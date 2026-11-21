@@ -1,12 +1,12 @@
-defmodule Jido.Workspace.Deploy.CaptureDeployTest do
+defmodule Jido.Realm.Host.Deploy.CaptureDeployTest do
   use ExUnit.Case, async: false
   @moduletag :integration
+  alias Jido.Realm.Host.Deploy
+  alias Jido.Realm.Host.Deploy.{Artifact, Snapshot}
+  alias Jido.Realm.Host.Deploy.Test.NodeApp
+  alias Jido.Realm.Host.Sandbox
   alias Jido.VFS
   alias Jido.VFS.Adapter.InMemory
-  alias Jido.Workspace.Deploy
-  alias Jido.Workspace.Deploy.{Artifact, Snapshot}
-  alias Jido.Workspace.Deploy.Test.NodeApp
-  alias Jido.Workspace.Sandbox
 
   test "fixed memory captures deploy and recover independently of live edits" do
     fs = InMemory.configure(name: make_ref())

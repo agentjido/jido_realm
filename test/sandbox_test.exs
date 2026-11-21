@@ -1,6 +1,6 @@
-defmodule Jido.Workspace.SandboxTest do
+defmodule Jido.Realm.Host.SandboxTest do
   use ExUnit.Case, async: true
-  alias Jido.Workspace.Sandbox
+  alias Jido.Realm.Host.Sandbox
 
   test "owned roots, relative paths, and provider capabilities are explicit" do
     {:ok, sandbox} = Sandbox.open()
@@ -23,12 +23,12 @@ defmodule Jido.Workspace.SandboxTest do
     {:ok, sandbox} = Sandbox.open()
     assert :ok = Sandbox.destroy(sandbox)
     refute File.exists?(sandbox.root)
-    assert [] = Registry.lookup(Jido.Workspace.Sandbox.Registry, sandbox.id)
+    assert [] = Registry.lookup(Jido.Realm.Host.Sandbox.Registry, sandbox.id)
     assert {:error, :not_found} = Sandbox.attach(sandbox.id)
   end
 
   test "the Local backend contract preserves existing calls" do
-    alias Jido.Workspace.Sandbox.Backends.Local
+    alias Jido.Realm.Host.Sandbox.Backends.Local
     {:ok, sandbox} = Sandbox.open(backend: {Local, []})
     on_exit(fn -> Sandbox.destroy(sandbox) end)
     assert %{provider: :local, cancellation: :direct_child} = Sandbox.capabilities(sandbox)
@@ -41,7 +41,7 @@ defmodule Jido.Workspace.SandboxTest do
   end
 
   test "invalid backend options fail without retaining an owned root" do
-    alias Jido.Workspace.Sandbox.Backends.{Docker, Local}
+    alias Jido.Realm.Host.Sandbox.Backends.{Docker, Local}
 
     root =
       Path.join(System.tmp_dir!(), "jido-invalid-backend-#{System.unique_integer([:positive])}")

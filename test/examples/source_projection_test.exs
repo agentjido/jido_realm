@@ -1,12 +1,12 @@
-defmodule Jido.Workspace.Deploy.SourceProjectionTest do
+defmodule Jido.Realm.Host.Deploy.SourceProjectionTest do
   use ExUnit.Case, async: false
   @moduletag :integration
-  alias Jido.Workspace.Deploy
-  alias Jido.Workspace.Deploy.{Artifact, Recipe, Snapshot}
+  alias Jido.Realm.Host.Deploy
+  alias Jido.Realm.Host.Deploy.{Artifact, Recipe, Snapshot}
 
   test "files-only deployment has one writer; wait timeouts do not cancel work" do
-    {:ok, sandbox} = Jido.Workspace.Sandbox.open()
-    on_exit(fn -> Jido.Workspace.Sandbox.destroy(sandbox) end)
+    {:ok, sandbox} = Jido.Realm.Host.Sandbox.open()
+    on_exit(fn -> Jido.Realm.Host.Sandbox.destroy(sandbox) end)
 
     {:ok, snapshot} =
       Snapshot.new(%{"index.txt" => %{bytes: "hello", mode: 0o644}}, id: "static-source")
@@ -36,8 +36,8 @@ defmodule Jido.Workspace.Deploy.SourceProjectionTest do
   end
 
   test "preparation cannot replace captured source bytes" do
-    {:ok, sandbox} = Jido.Workspace.Sandbox.open()
-    on_exit(fn -> Jido.Workspace.Sandbox.destroy(sandbox) end)
+    {:ok, sandbox} = Jido.Realm.Host.Sandbox.open()
+    on_exit(fn -> Jido.Realm.Host.Sandbox.destroy(sandbox) end)
     {:ok, snapshot} = Snapshot.new(%{"file" => %{bytes: "original", mode: 0o644}})
     {:ok, artifact} = Artifact.new(:source, "1", snapshot)
     {:ok, target} = Deploy.source_target(sandbox, "static")

@@ -1,31 +1,31 @@
-defmodule Jido.Workspace.OwnedWorkspaceTest do
+defmodule Jido.Realm.Host.OwnedWorkspaceTest do
   use ExUnit.Case, async: false
-  alias Jido.Workspace
+  alias Jido.Realm.Host
 
   test "one owned environment shares shell edits and checked captures" do
-    {:ok, ws} = Workspace.open()
+    {:ok, ws} = Host.open()
 
     try do
-      {:ok, fs} = Workspace.filesystem(ws)
-      {:ok, shell} = Workspace.shell(ws)
-      assert {:ok, ^shell} = Workspace.shell(ws)
-      {:ok, before, token} = Workspace.capture(ws)
+      {:ok, fs} = Host.filesystem(ws)
+      {:ok, shell} = Host.shell(ws)
+      assert {:ok, ^shell} = Host.shell(ws)
+      {:ok, before, token} = Host.capture(ws)
       assert :ok = Jido.Shell.Agent.write_file(shell, "/source", "new")
 
-      assert {:error, %Jido.Workspace.Error{code: :stale_revision}} =
-               Workspace.replace(ws, before, expected: token)
+      assert {:error, %Jido.Realm.Host.Error{code: :stale_revision}} =
+               Host.replace(ws, before, expected: token)
 
       assert {:ok, "new"} = Jido.VFS.read(fs, "source")
-      {:ok, current, token} = Workspace.capture(ws)
-      assert {:ok, _} = Workspace.replace(ws, before, expected: token)
-      assert :ok = Workspace.stop_session(ws)
+      {:ok, current, token} = Host.capture(ws)
+      assert {:ok, _} = Host.replace(ws, before, expected: token)
+      assert :ok = Host.stop_session(ws)
       assert {:ok, :missing} = Jido.VFS.file_exists(fs, "source")
-      :ok = Workspace.close(ws)
+      :ok = Host.close(ws)
       assert {:ok, "new"} = Jido.VFS.read(current, "source")
-      assert :ok = Workspace.close(ws)
-      assert {:error, %Jido.Workspace.Error{code: :closed}} = Workspace.filesystem(ws)
+      assert :ok = Host.close(ws)
+      assert {:error, %Jido.Realm.Host.Error{code: :closed}} = Host.filesystem(ws)
     after
-      Workspace.close(ws)
+      Host.close(ws)
     end
   end
 
@@ -34,11 +34,11 @@ defmodule Jido.Workspace.OwnedWorkspaceTest do
 
     owner =
       spawn(fn ->
-        {:ok, ws} = Workspace.open()
-        {:ok, fs} = Workspace.filesystem(ws)
-        {:ok, shell} = Workspace.shell(ws)
+        {:ok, ws} = Host.open()
+        {:ok, fs} = Host.filesystem(ws)
+        {:ok, shell} = Host.shell(ws)
         :ok = Jido.VFS.write(fs, "source", "saved")
-        {:ok, saved, _} = Workspace.capture(ws)
+        {:ok, saved, _} = Host.capture(ws)
         send(parent, {:workspace, ws, fs, shell, saved})
 
         receive do
@@ -67,7 +67,7 @@ defmodule Jido.Workspace.OwnedWorkspaceTest do
     name = make_ref()
 
     assert {:error, _} =
-             Workspace.open(
+             Host.open(
                id: "failed-owned-start",
                adapter_opts: [name: name],
                start_session: true,
@@ -79,9 +79,9 @@ defmodule Jido.Workspace.OwnedWorkspaceTest do
   end
 
   test "storage failure closes the environment instead of restarting it empty" do
-    {:ok, ws} = Workspace.open()
-    {:ok, {_adapter, config}} = Workspace.filesystem(ws)
-    {:ok, shell} = Workspace.shell(ws)
+    {:ok, ws} = Host.open()
+    {:ok, {_adapter, config}} = Host.filesystem(ws)
+    {:ok, shell} = Host.shell(ws)
     {:ok, session} = Jido.Shell.ShellSession.lookup(shell)
     ref = Process.monitor(ws.lifetime)
     session_ref = Process.monitor(session)
@@ -89,58 +89,58 @@ defmodule Jido.Workspace.OwnedWorkspaceTest do
     Process.exit(storage, :kill)
     assert_receive {:DOWN, ^ref, :process, _, _}, 2_000
     assert_receive {:DOWN, ^session_ref, :process, _, _}, 2_000
-    assert {:error, %Jido.Workspace.Error{code: :closed}} = Workspace.filesystem(ws)
+    assert {:error, %Jido.Realm.Host.Error{code: :closed}} = Host.filesystem(ws)
   end
 
   test "captures refuse multiple mounts" do
-    {:ok, ws} = Workspace.open()
+    {:ok, ws} = Host.open()
 
     try do
       :ok = Jido.Shell.VFS.mount(ws.id, "/scratch", Jido.VFS.Adapter.InMemory, name: make_ref())
 
-      assert {:error, %Jido.Workspace.Error{code: :unsupported_capability}} =
-               Workspace.capture(ws)
+      assert {:error, %Jido.Realm.Host.Error{code: :unsupported_capability}} =
+               Host.capture(ws)
     after
-      Workspace.close(ws)
+      Host.close(ws)
     end
   end
 
   test "closed handles cannot access a new workspace with the same ID" do
-    {:ok, old} = Workspace.open(id: "reused-workspace")
-    :ok = Workspace.close(old)
-    {:ok, fresh} = Workspace.open(id: "reused-workspace")
+    {:ok, old} = Host.open(id: "reused-workspace")
+    :ok = Host.close(old)
+    {:ok, fresh} = Host.open(id: "reused-workspace")
 
     try do
-      :ok = Workspace.write(fresh, "/keep", "safe")
-      assert {:error, %Jido.Workspace.Error{code: :closed}} = Workspace.write(old, "/keep", "bad")
-      assert {:error, %Jido.Workspace.Error{code: :closed}} = Workspace.read(old, "/keep")
-      assert {:error, %Jido.Workspace.Error{code: :closed}} = Workspace.list(old)
-      assert {:error, %Jido.Workspace.Error{code: :closed}} = Workspace.delete(old, "/keep")
-      assert {:error, %Jido.Workspace.Error{code: :closed}} = Workspace.mkdir(old, "/bad")
-      assert {:ok, "safe"} = Workspace.read(fresh, "/keep")
+      :ok = Host.write(fresh, "/keep", "safe")
+      assert {:error, %Jido.Realm.Host.Error{code: :closed}} = Host.write(old, "/keep", "bad")
+      assert {:error, %Jido.Realm.Host.Error{code: :closed}} = Host.read(old, "/keep")
+      assert {:error, %Jido.Realm.Host.Error{code: :closed}} = Host.list(old)
+      assert {:error, %Jido.Realm.Host.Error{code: :closed}} = Host.delete(old, "/keep")
+      assert {:error, %Jido.Realm.Host.Error{code: :closed}} = Host.mkdir(old, "/bad")
+      assert {:ok, "safe"} = Host.read(fresh, "/keep")
     after
-      Workspace.close(fresh)
+      Host.close(fresh)
     end
   end
 
   test "reused session names do not transfer ownership" do
-    {:ok, a} = Workspace.open()
-    {:ok, b} = Workspace.open()
+    {:ok, a} = Host.open()
+    {:ok, b} = Host.open()
     id = "reused-owned-session"
 
     try do
-      {:ok, _} = Workspace.start_session(a, session_id: id)
+      {:ok, _} = Host.start_session(a, session_id: id)
       :ok = Jido.Shell.ShellSession.stop(id)
-      {:ok, _} = Workspace.start_session(b, session_id: id)
+      {:ok, _} = Host.start_session(b, session_id: id)
       {:ok, b_pid} = Jido.Shell.ShellSession.lookup(id)
-      assert {:ok, _} = Workspace.run(a, "write /only-a yes")
-      assert {:ok, "yes"} = Workspace.read(a, "/only-a")
-      assert {:error, _} = Workspace.read(b, "/only-a")
-      :ok = Workspace.close(a)
+      assert {:ok, _} = Host.run(a, "write /only-a yes")
+      assert {:ok, "yes"} = Host.read(a, "/only-a")
+      assert {:error, _} = Host.read(b, "/only-a")
+      :ok = Host.close(a)
       assert Process.alive?(b_pid)
     after
-      Workspace.close(a)
-      Workspace.close(b)
+      Host.close(a)
+      Host.close(b)
     end
   end
 end

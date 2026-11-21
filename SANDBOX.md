@@ -1,35 +1,35 @@
-# Workspace Sandbox
+# Realm Sandbox
 
 The Sandbox boundary owns execution environments and retained services.
-It uses Elixir and OTP inside the `jido_workspace` package.
+It uses Elixir and OTP inside the `jido_realm` package.
 
 The Local backend runs separate OS processes under the current user. It does
 not provide OS security isolation. Use trusted code with Local. The Docker
 backend runs commands in containers. gVisor uses Docker with the `runsc` runtime.
 Apple Container runs each command in a Linux VM on Apple silicon.
 
-Workspace policy applies to file changes and execution. See [Policy](README.md#policy).
+Realm policy applies to file changes and execution. See [Policy](HOST.md#policy).
 
 ## Use
 
 ```elixir
-{:ok, sandbox} = Jido.Workspace.Sandbox.open()
+{:ok, sandbox} = Jido.Realm.Host.Sandbox.open()
 
-:ok = Jido.Workspace.Sandbox.write(sandbox, "input.txt", "hello")
-{:ok, result} = Jido.Workspace.Sandbox.exec(sandbox, "/bin/cat", ["input.txt"])
+:ok = Jido.Realm.Host.Sandbox.write(sandbox, "input.txt", "hello")
+{:ok, result} = Jido.Realm.Host.Sandbox.exec(sandbox, "/bin/cat", ["input.txt"])
 result.output
 # "hello"
 
-{:ok, service} = Jido.Workspace.Sandbox.start_service(sandbox, %{
+{:ok, service} = Jido.Realm.Host.Sandbox.start_service(sandbox, %{
   kind: :beam,
   args: ["+S", "2"]
 })
 
-{:ok, os_pid} = Jido.Workspace.Sandbox.call(sandbox, service, :os, :getpid, [])
-:ok = Jido.Workspace.Sandbox.close(sandbox)
-{:ok, sandbox} = Jido.Workspace.Sandbox.attach(sandbox.id)
-:ok = Jido.Workspace.Sandbox.stop_service(sandbox, service)
-:ok = Jido.Workspace.Sandbox.destroy(sandbox)
+{:ok, os_pid} = Jido.Realm.Host.Sandbox.call(sandbox, service, :os, :getpid, [])
+:ok = Jido.Realm.Host.Sandbox.close(sandbox)
+{:ok, sandbox} = Jido.Realm.Host.Sandbox.attach(sandbox.id)
+:ok = Jido.Realm.Host.Sandbox.stop_service(sandbox, service)
+:ok = Jido.Realm.Host.Sandbox.destroy(sandbox)
 ```
 
 An external service uses `kind: :exec`, `executable`, and an `args` list.
@@ -46,8 +46,8 @@ Its output and exit status are still collected.
 ## Docker and gVisor
 
 ```elixir
-alias Jido.Workspace.Sandbox
-alias Jido.Workspace.Sandbox.Backends.Docker
+alias Jido.Realm.Host.Sandbox
+alias Jido.Realm.Host.Sandbox.Backends.Docker
 
 # Pull or build the image before open. The API never pulls an image.
 {:ok, box} = Sandbox.open(backend: {Docker, [image: "alpine:latest"]})
@@ -85,8 +85,8 @@ Do not mount the Docker socket or add arbitrary Docker flags through command dat
 
 Docker supports `kind: :exec`. BEAM services and calls return
 `{:error, {:unsupported_capability, :beam_call}}`. Use a named Docker
-profile and `Jido.Workspace.run/3` with `stdin: :pipe` to send input during
-a command. Use `Jido.Workspace.connect/3` for approved loopback service ports.
+profile and `Jido.Realm.Host.run/3` with `stdin: :pipe` to send input during
+a command. Use `Jido.Realm.Host.connect/3` for approved loopback service ports.
 The controller reports the effective capabilities.
 
 `start_service` returns after container creation. Container start can still fail.
@@ -99,14 +99,14 @@ No images, networks, or named volumes are created by this backend. Cleanup error
 are returned. A lost engine connection can leave resources; retry destroy when
 the engine is available. Controller shutdown leaves the owned root as with Local.
 
-The backend behaviour is in `lib/jido_workspace/sandbox/backend.ex`. The controller
+The backend behaviour is in `lib/jido_realm/host/sandbox/backend.ex`. The controller
 owns file access, policy, file views, output buffers, and status. The backend owns
 service creation, exit verification, cancellation, and resource cleanup. See
 [API_SPEC.md](API_SPEC.md#first-backend-increment-local-docker-and-gvisor).
 
 ## Apple Container
 
-Select `provider: :apple_container` and a local `image` in a named Workspace
+Select `provider: :apple_container` and a local `image` in a named Realm
 profile. The backend requires a running Apple Container 1.x service, version
 1.7.1 or later, on Apple silicon with macOS 26 or later. The backend checks
 these requirements and the local ARM64 image before it creates the workspace
@@ -114,9 +114,9 @@ directory. Each command has a separate VM and uses a disposable bind mount.
 
 The backend removes the exact container for each execution after exit, stop,
 or timeout. The backend checks the list of all containers before it confirms
-removal. If it cannot confirm cleanup, Workspace keeps writes and saves fenced.
+removal. If it cannot confirm cleanup, Realm keeps writes and saves fenced.
 Retry close when the service is available. The example lists the capabilities
-that a profile can require. [Apple Container profile and tests](https://github.com/agentjido/jido_workspace/tree/main/examples/04_sandboxes_toolchains_and_services/04_07_run_on_apple_container)
+that a profile can require. [Apple Container profile and tests](https://github.com/agentjido/jido_realm/tree/main/examples/04_sandboxes_toolchains_and_services/04_07_run_on_apple_container)
 
 ## Ownership
 
@@ -146,14 +146,14 @@ checks do not turn the local provider into a security sandbox.
 The default Local runner uses a Port. Stop and timeout send SIGKILL to
 the direct child and wait for the port's exit status. A lost port can
 leave the process alive. Use trusted foreground tools with this runner.
-[Local Workspace profile](https://github.com/agentjido/jido_workspace/tree/main/examples/04_sandboxes_toolchains_and_services/04_01_run_a_disposable_local_sandbox)
+[Local Realm profile](https://github.com/agentjido/jido_realm/tree/main/examples/04_sandboxes_toolchains_and_services/04_01_run_a_disposable_local_sandbox)
 
 Use `runner: :erlexec` with the Local provider to start external tools
-in private process groups. Workspace checks that the group is gone
+in private process groups. Realm checks that the group is gone
 before it reports an exit or a confirmed stop. Use trusted tools that
 keep all their writers in the group. If the backend cannot confirm
 cleanup, destroy returns a cleanup error and keeps the owned directory.
-[Process group profile](https://github.com/agentjido/jido_workspace/tree/main/examples/04_sandboxes_toolchains_and_services/04_03_supervise_a_native_process)
+[Process group profile](https://github.com/agentjido/jido_realm/tree/main/examples/04_sandboxes_toolchains_and_services/04_03_supervise_a_native_process)
 
 ## Tests
 
@@ -174,7 +174,7 @@ Live Docker tests use an installed Alpine image. The full set of numbered
 examples also uses a pinned Python image. Install both before you run all
 the examples. The test run fails if a required image or the engine is
 unavailable. Without the flag, these tests are marked skipped.
-[Install the Python fixture](https://github.com/agentjido/jido_workspace/blob/main/examples/04_sandboxes_toolchains_and_services/04_04_use_a_pinned_language_toolchain/README.md#install-the-image)
+[Install the Python fixture](https://github.com/agentjido/jido_realm/blob/main/examples/04_sandboxes_toolchains_and_services/04_04_use_a_pinned_language_toolchain/README.md#install-the-image)
 
 ```sh
 # Optional preparation if this image is not installed:

@@ -4,19 +4,19 @@ Write an enumerable of byte chunks and read a file by offset. The same
 calls work on memory and Docker.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
-{:ok, workspace} = Workspace.open(profile: :memory)
+{:ok, workspace} = Host.open(profile: :memory)
 
 try do
-  :ok = Workspace.mkdir(workspace, "reports")
+  :ok = Host.mkdir(workspace, "reports")
   chunks = File.stream!("input.bin", 65_536, [])
-  :ok = Workspace.write_stream(workspace, "reports/input.bin", chunks)
+  :ok = Host.write_stream(workspace, "reports/input.bin", chunks)
 
-  {:ok, bytes} = Workspace.read_chunk(workspace, "reports/input.bin", 0, 65_536)
+  {:ok, bytes} = Host.read_chunk(workspace, "reports/input.bin", 0, 65_536)
   byte_size(bytes)
 after
-  :ok = Workspace.close(workspace)
+  :ok = Host.close(workspace)
 end
 ```
 
@@ -61,5 +61,5 @@ The tests copy a binary file, compare its checksum, and check the large
 file again after save and reopen. A barrier stops the producer after
 the first chunk. Both providers preserve the previous file when the
 producer exits. The Docker tests use a host checkout to check close,
-Workspace controller loss, and loss of the sandbox process that owns
+Realm controller loss, and loss of the sandbox process that owns
 the temporary file. [Tests](example_test.exs)

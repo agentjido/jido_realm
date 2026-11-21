@@ -4,27 +4,27 @@ Two editors can read the same draft and prepare different changes. Use the
 revision from the read to prevent a late edit from overwriting the first one.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
-{:ok, workspace} = Workspace.open(profile: :memory)
+{:ok, workspace} = Host.open(profile: :memory)
 
 try do
-  :ok = Workspace.write(workspace, "draft.txt", "Original\n")
-  {:ok, original, revision} = Workspace.read(workspace, "draft.txt", revision: true)
+  :ok = Host.write(workspace, "draft.txt", "Original\n")
+  {:ok, original, revision} = Host.read(workspace, "draft.txt", revision: true)
 
   :ok =
-    Workspace.write(workspace, "draft.txt", [original, "First edit\n"],
+    Host.write(workspace, "draft.txt", [original, "First edit\n"],
       expected: revision
     )
 
-  {:error, %Workspace.Error{code: :stale_revision}} =
-    Workspace.write(workspace, "draft.txt", [original, "Second edit\n"],
+  {:error, %Host.Error{code: :stale_revision}} =
+    Host.write(workspace, "draft.txt", [original, "Second edit\n"],
       expected: revision
     )
 
-  {:ok, "Original\nFirst edit\n"} = Workspace.read(workspace, "draft.txt")
+  {:ok, "Original\nFirst edit\n"} = Host.read(workspace, "draft.txt")
 after
-  :ok = Workspace.close(workspace)
+  :ok = Host.close(workspace)
 end
 ```
 

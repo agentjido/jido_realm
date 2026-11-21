@@ -25,12 +25,12 @@ configuration. [Profile and commands](example.ex)
 ```
 
 Start the approved command in another process with
-`Workspace.run(workspace, ["/workspace/bin/verify"], stdin: :pipe)`.
+`Host.run(workspace, ["/workspace/bin/verify"], stdin: :pipe)`.
 Use the execution ID from the command start event to send input from
 the host. [Observe command events](../../05_lifecycle/05_04_inspect_state/README.md)
 
 ```elixir
-Workspace.input(workspace, execution_id, fixture_credential <> "\n")
+Host.input(workspace, execution_id, fixture_credential <> "\n")
 ```
 
 Retry the input call on `:input_not_ready` or `:input_busy`. A
@@ -42,7 +42,7 @@ The Docker profile mounts the checkout read-only and disables
 networking and container logging. With a zero-byte output limit, live
 and final results retain no command output bytes. They can still report
 the number of bytes dropped, truncation, exit status, and duration.
-Workspace removes raw input and port output from formatted OTP status
+Realm removes raw input and port output from formatted OTP status
 reports. Raw VM tracing and debug buffers can expose the credential.
 The host controls access to VM debugging and the Docker daemon.
 The tool allowlist checks the command entry point. The program controls

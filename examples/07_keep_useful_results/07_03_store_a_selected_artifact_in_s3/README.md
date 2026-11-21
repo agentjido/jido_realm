@@ -12,16 +12,16 @@ with a read-only profile. A Docker review uses the same calls and store
 ID as a memory review.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
-{:ok, review} = Workspace.open(profile: :review, from: Jason.decode!(approved_reference))
+{:ok, review} = Host.open(profile: :review, from: Jason.decode!(approved_reference))
 
 report =
   try do
-    {:ok, bytes} = Workspace.read(review, "report.txt")
+    {:ok, bytes} = Host.read(review, "report.txt")
     bytes
   after
-    :ok = Workspace.close(review)
+    :ok = Host.close(review)
   end
 ```
 
@@ -32,12 +32,12 @@ credentials as `host_s3_config`. Keep them in the host application. Give
 the host session `s3:PutObject` and `s3:GetObject` on
 `arn:aws:s3:::BUCKET/workspace-results/sha256/*`. The adapter prefix
 selects the key namespace. The object store policy enforces access.
-[S3 adapter setup](../../../docs/vfs/README.md#s3-adapter)
+[S3 adapter setup](https://github.com/agentjido/jido_vfs#s3-adapter)
 
 ```elixir
 Code.require_file("examples/07_keep_useful_results/07_03_store_a_selected_artifact_in_s3/example.ex")
 alias Jido.VFS.Adapter.S3
-alias Jido.Workspace.Examples.StoreS3Artifact
+alias Jido.Realm.Host.Examples.StoreS3Artifact
 
 destination = S3.configure(bucket: bucket_name, prefix: "workspace-results", config: host_s3_config)
 {:ok, digest} = StoreS3Artifact.put(destination, report)

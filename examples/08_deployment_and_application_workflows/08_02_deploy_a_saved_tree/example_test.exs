@@ -1,12 +1,12 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 
-defmodule Jido.Workspace.Examples.DeploySavedTreeTest do
+defmodule Jido.Realm.Host.Examples.DeploySavedTreeTest do
   use ExUnit.Case, async: false
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Deploy, Sandbox}
-  alias Jido.Workspace.Deploy.{Artifact, Recipe, Snapshot}
-  alias Jido.Workspace.Examples.LifecycleSupport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Deploy, Sandbox}
+  alias Jido.Realm.Host.Deploy.{Artifact, Recipe, Snapshot}
+  alias Jido.Realm.Host.Examples.LifecycleSupport
 
   @moduletag :integration
   @moduletag :tmp_dir
@@ -17,10 +17,10 @@ defmodule Jido.Workspace.Examples.DeploySavedTreeTest do
   setup %{tmp_dir: root} do
     store = Path.join(root, "snapshots")
     LifecycleSupport.configure(store)
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
 
     Application.put_env(
-      :jido_workspace,
+      :jido_realm,
       :profiles,
       Map.merge(profiles, %{
         reader: %{profiles.memory | policy: :read_only},
@@ -30,7 +30,7 @@ defmodule Jido.Workspace.Examples.DeploySavedTreeTest do
       })
     )
 
-    Application.put_env(:jido_workspace, :stores, %{"reports" => store, "other" => store})
+    Application.put_env(:jido_realm, :stores, %{"reports" => store, "other" => store})
     %{store: store}
   end
 
@@ -127,33 +127,33 @@ defmodule Jido.Workspace.Examples.DeploySavedTreeTest do
   end
 
   defp save_then_edit(profile) do
-    assert {:ok, workspace} = Workspace.open(profile: profile)
+    assert {:ok, workspace} = Host.open(profile: profile)
 
     try do
-      assert :ok = Workspace.mkdir(workspace, "bin")
-      assert :ok = Workspace.mkdir(workspace, "var")
-      assert :ok = Workspace.mkdir(workspace, "var/empty")
-      assert :ok = Workspace.write(workspace, @report_path, @bytes)
+      assert :ok = Host.mkdir(workspace, "bin")
+      assert :ok = Host.mkdir(workspace, "var")
+      assert :ok = Host.mkdir(workspace, "var/empty")
+      assert :ok = Host.write(workspace, @report_path, @bytes)
 
       if profile == :docker do
         assert :ok =
-                 Workspace.write(
+                 Host.write(
                    workspace,
                    "bin/check.sh",
                    "#!/bin/sh\nprintf 'saved runner\\n'\n"
                  )
 
         assert {:ok, %{exit_status: 0}} =
-                 Workspace.run(workspace, ["chmod", "+x", "bin/check.sh"])
+                 Host.run(workspace, ["chmod", "+x", "bin/check.sh"])
       end
 
-      assert {:ok, reference} = Workspace.save(workspace)
-      assert :ok = Workspace.write(workspace, @report_path, "revised bytes")
-      assert :ok = Workspace.write(workspace, "draft.txt", "unsaved")
-      assert :ok = Workspace.delete(workspace, "var/empty")
+      assert {:ok, reference} = Host.save(workspace)
+      assert :ok = Host.write(workspace, @report_path, "revised bytes")
+      assert :ok = Host.write(workspace, "draft.txt", "unsaved")
+      assert :ok = Host.delete(workspace, "var/empty")
       reference
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 

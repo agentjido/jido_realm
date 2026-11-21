@@ -1,6 +1,6 @@
 # 08.04 Upgrade an OTP release
 
-Start an OTP release from a saved Workspace tree. Upgrade it while its counter is live, then downgrade it without losing the latest state. A third release fails in `code_change/3`. Observe the restart and recover explicitly from the booted state.
+Start an OTP release from a saved Realm tree. Upgrade it while its counter is live, then downgrade it without losing the latest state. A third release fails in `code_change/3`. Observe the restart and recover explicitly from the booted state.
 
 ## Save the release trees
 
@@ -12,30 +12,30 @@ MIX_ENV=test iex -S mix
 ```
 
 ```elixir
-alias Jido.Workspace
-alias Jido.Workspace.{Deploy, Sandbox}
-alias Jido.Workspace.Deploy.{Artifact, OTP, Snapshot}
-alias Jido.Workspace.Deploy.Test.Releases
+alias Jido.Realm.Host
+alias Jido.Realm.Host.{Deploy, Sandbox}
+alias Jido.Realm.Host.Deploy.{Artifact, OTP, Snapshot}
+alias Jido.Realm.Host.Deploy.Test.Releases
 
 root = System.fetch_env!("WORKSPACE_RESULTS_DIR")
-Application.put_env(:jido_workspace, :stores, %{"releases" => Path.join(root, "snapshots")})
-Application.put_env(:jido_workspace, :profiles, %{
+Application.put_env(:jido_realm, :stores, %{"releases" => Path.join(root, "snapshots")})
+Application.put_env(:jido_realm, :profiles, %{
   builder: %{provider: :memory, policy: :workspace_write, store: "releases"},
   reader: %{provider: :memory, policy: :read_only, store: "releases"}
 })
 
 saved = for {version, fixture} <- Releases.build(Path.join(root, "build")), into: %{} do
-  {:ok, workspace} = Workspace.open(profile: :builder)
+  {:ok, workspace} = Host.open(profile: :builder)
 
   try do
     for {path, %{bytes: bytes}} <- fixture.snapshot.entries do
-      :ok = Workspace.write(workspace, path, bytes)
+      :ok = Host.write(workspace, path, bytes)
     end
 
-    {:ok, reference} = Workspace.save(workspace)
+    {:ok, reference} = Host.save(workspace)
     {version, reference}
   after
-    :ok = Workspace.close(workspace)
+    :ok = Host.close(workspace)
   end
 end
 

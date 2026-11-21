@@ -4,9 +4,9 @@ Require disabled networking in the host profile. The same profile can
 still run a command that reads a file from its workspace.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
-Application.put_env(:jido_workspace, :profiles, %{
+Application.put_env(:jido_realm, :profiles, %{
   offline: %{
     provider: :docker,
     image: "alpine:3.20",
@@ -15,14 +15,14 @@ Application.put_env(:jido_workspace, :profiles, %{
   }
 })
 
-{:ok, workspace} = Workspace.open(profile: :offline)
-:ok = Workspace.write(workspace, "report.txt", "Local report")
+{:ok, workspace} = Host.open(profile: :offline)
+:ok = Host.write(workspace, "report.txt", "Local report")
 {:ok, %{exit_status: 0, output: "Local report"}} =
-  Workspace.run(workspace, ["cat", "report.txt"])
-:ok = Workspace.close(workspace)
+  Host.run(workspace, ["cat", "report.txt"])
+:ok = Host.close(workspace)
 ```
 
-Workspace checks the network requirement at open. The Docker provider
+Realm checks the network requirement at open. The Docker provider
 uses the `none` network driver for each command. This gives the container
 its own loopback interface and keeps it off other networks. Memory
 meets the requirement through its virtual tools. A memory profile
@@ -31,9 +31,9 @@ refuses the native HTTP client before execution. [Docker none driver](https://do
 ## Test a live endpoint
 
 The test starts a private HTTP endpoint on a temporary internal Docker
-bridge. It uses the image that Workspace selected. A control container
+bridge. It uses the image that Realm selected. A control container
 on that bridge receives the fixture bytes before and after the
-Workspace request. The probe runs the same request inside Workspace.
+Realm request. The probe runs the same request inside Realm.
 It exits with a nonzero status, and inspection
 confirms that Docker used network mode `none`. The workspace can still
 edit and save its tree. [NetworkProbe](example.ex)

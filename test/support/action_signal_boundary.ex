@@ -1,4 +1,4 @@
-defmodule Jido.Workspace.TestSupport.ActionBoundary do
+defmodule Jido.Realm.Host.TestSupport.ActionBoundary do
   @moduledoc "Test adapter for current APIs. See API_SPEC.md for proposed contracts."
 
   def schema(fields \\ %{}) do
@@ -72,7 +72,7 @@ defmodule Jido.Workspace.TestSupport.ActionBoundary do
   defp error_data({:policy_denied, action}),
     do: %{code: "policy_denied", action: to_string(action)}
 
-  defp error_data(%Jido.Workspace.Error{} = error),
+  defp error_data(%Jido.Realm.Host.Error{} = error),
     do: %{
       code: to_string(error.code),
       operation: to_string(error.operation),
@@ -85,9 +85,9 @@ defmodule Jido.Workspace.TestSupport.ActionBoundary do
   defp error_data(reason), do: %{code: "operation_failed", cause: inspect(reason)}
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Write do
+defmodule Jido.Realm.Host.TestSupport.Actions.Write do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
 
   use Jido.Action,
     name: "workspace_test_write",
@@ -95,16 +95,16 @@ defmodule Jido.Workspace.TestSupport.Actions.Write do
 
   def run(params, context) do
     Boundary.perform(params, context, :workspace, fn ws, _store ->
-      with :ok <- Jido.Workspace.write(ws, params.path, params.content),
+      with :ok <- Jido.Realm.Host.write(ws, params.path, params.content),
            do: {:ok, %{path: params.path}}
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Mkdir do
+defmodule Jido.Realm.Host.TestSupport.Actions.Mkdir do
   @moduledoc false
-  alias Jido.Workspace
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
 
   use Jido.Action,
     name: "workspace_file_test_mkdir",
@@ -112,15 +112,15 @@ defmodule Jido.Workspace.TestSupport.Actions.Mkdir do
 
   def run(params, context) do
     Boundary.perform(params, context, :workspace, fn ws, _store ->
-      with :ok <- Workspace.mkdir(ws, params.path), do: {:ok, %{path: params.path}}
+      with :ok <- Host.mkdir(ws, params.path), do: {:ok, %{path: params.path}}
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Delete do
+defmodule Jido.Realm.Host.TestSupport.Actions.Delete do
   @moduledoc false
-  alias Jido.Workspace
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
 
   use Jido.Action,
     name: "workspace_file_test_delete",
@@ -128,27 +128,27 @@ defmodule Jido.Workspace.TestSupport.Actions.Delete do
 
   def run(params, context) do
     Boundary.perform(params, context, :workspace, fn ws, _store ->
-      with :ok <- Workspace.delete(ws, params.path), do: {:ok, %{path: params.path}}
+      with :ok <- Host.delete(ws, params.path), do: {:ok, %{path: params.path}}
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Close do
+defmodule Jido.Realm.Host.TestSupport.Actions.Close do
   @moduledoc false
-  alias Jido.Workspace
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
   use Jido.Action, name: "workspace_file_test_close", schema: Boundary.schema()
 
   def run(params, context) do
     Boundary.perform(params, context, :workspace, fn ws, _store ->
-      with :ok <- Workspace.close(ws), do: {:ok, %{closed: true}}
+      with :ok <- Host.close(ws), do: {:ok, %{closed: true}}
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Run do
+defmodule Jido.Realm.Host.TestSupport.Actions.Run do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
 
   use Jido.Action,
     name: "workspace_test_run",
@@ -169,7 +169,7 @@ defmodule Jido.Workspace.TestSupport.Actions.Run do
         end
 
       with {:ok, view} <- expected do
-        case Jido.Workspace.run(ws, params.command,
+        case Jido.Realm.Host.run(ws, params.command,
                files: view,
                timeout_ms: params.timeout_ms,
                output_limit: params.output_limit
@@ -185,117 +185,117 @@ defmodule Jido.Workspace.TestSupport.Actions.Run do
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Info do
+defmodule Jido.Realm.Host.TestSupport.Actions.Info do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
   use Jido.Action, name: "workspace_test_info", schema: Boundary.schema()
 
   def run(params, context) do
     Boundary.perform(params, context, :workspace, fn ws, _ ->
-      with {:ok, info} <- Jido.Workspace.info(ws),
+      with {:ok, info} <- Jido.Realm.Host.info(ws),
            do: {:ok, Map.take(info, [:id, :policy, :session])}
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.List do
+defmodule Jido.Realm.Host.TestSupport.Actions.List do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
   use Jido.Action, name: "workspace_test_list", schema: Boundary.schema(%{path: Zoi.string()})
 
   def run(params, context) do
     Boundary.perform(params, context, :workspace, fn ws, _ ->
-      with {:ok, entries} <- Jido.Workspace.list(ws, params.path),
+      with {:ok, entries} <- Jido.Realm.Host.list(ws, params.path),
            do: {:ok, %{entries: Enum.map(entries, &Map.from_struct/1)}}
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.FileView do
+defmodule Jido.Realm.Host.TestSupport.Actions.FileView do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
   use Jido.Action, name: "workspace_test_file_view", schema: Boundary.schema()
 
   def run(params, context) do
     Boundary.perform(params, context, :workspace, fn ws, store ->
-      with {:ok, view} <- Jido.Workspace.file_view(ws),
+      with {:ok, view} <- Jido.Realm.Host.file_view(ws),
            do: {:ok, %{file_view_ref: Boundary.put(store, params.resource_id, :file_view, view)}}
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.StartSession do
+defmodule Jido.Realm.Host.TestSupport.Actions.StartSession do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
   use Jido.Action, name: "workspace_test_start_session", schema: Boundary.schema()
 
   def run(params, context) do
     Boundary.perform(params, context, :workspace, fn ws, store ->
-      with {:ok, session} <- Jido.Workspace.start_session(ws),
+      with {:ok, session} <- Jido.Realm.Host.start_session(ws),
            do: {:ok, %{session_ref: Boundary.put(store, params.resource_id, :session, session)}}
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.StopSession do
+defmodule Jido.Realm.Host.TestSupport.Actions.StopSession do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
   use Jido.Action, name: "workspace_test_stop_session", schema: Boundary.schema()
 
   def run(params, context) do
     Boundary.perform(params, context, :workspace, fn ws, _ ->
-      with :ok <- Jido.Workspace.stop_session(ws), do: {:ok, %{stopped: true}}
+      with :ok <- Jido.Realm.Host.stop_session(ws), do: {:ok, %{stopped: true}}
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Filesystem do
+defmodule Jido.Realm.Host.TestSupport.Actions.Filesystem do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
   use Jido.Action, name: "workspace_test_filesystem", schema: Boundary.schema()
 
   def run(params, context) do
     Boundary.perform(params, context, :workspace, fn ws, store ->
-      with {:ok, fs} <- Jido.Workspace.filesystem(ws),
+      with {:ok, fs} <- Jido.Realm.Host.filesystem(ws),
            do: {:ok, %{filesystem_ref: Boundary.put(store, params.resource_id, :filesystem, fs)}}
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Shell do
+defmodule Jido.Realm.Host.TestSupport.Actions.Shell do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
   use Jido.Action, name: "workspace_test_shell", schema: Boundary.schema()
 
   def run(params, context) do
     Boundary.perform(params, context, :workspace, fn ws, store ->
-      with {:ok, session} <- Jido.Workspace.shell(ws),
+      with {:ok, session} <- Jido.Realm.Host.shell(ws),
            do: {:ok, %{session_ref: Boundary.put(store, params.resource_id, :session, session)}}
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Read do
+defmodule Jido.Realm.Host.TestSupport.Actions.Read do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
   use Jido.Action, name: "workspace_test_read", schema: Boundary.schema(%{path: Zoi.string()})
 
   def run(params, context) do
     Boundary.perform(params, context, :workspace, fn ws, _store ->
-      with {:ok, content} <- Jido.Workspace.read(ws, params.path),
+      with {:ok, content} <- Jido.Realm.Host.read(ws, params.path),
            do: {:ok, %{path: params.path, content: content}}
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Capture do
+defmodule Jido.Realm.Host.TestSupport.Actions.Capture do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
   use Jido.Action, name: "workspace_test_capture", schema: Boundary.schema()
 
   def run(params, context) do
     Boundary.perform(params, context, :workspace, fn ws, store ->
-      with {:ok, capture, revision} <- Jido.Workspace.capture(ws) do
+      with {:ok, capture, revision} <- Jido.Realm.Host.capture(ws) do
         {:ok,
          %{
            capture_ref: Boundary.put(store, params.resource_id, :capture, capture),
@@ -306,9 +306,9 @@ defmodule Jido.Workspace.TestSupport.Actions.Capture do
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Replace do
+defmodule Jido.Realm.Host.TestSupport.Actions.Replace do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
 
   use Jido.Action,
     name: "workspace_test_replace",
@@ -320,16 +320,16 @@ defmodule Jido.Workspace.TestSupport.Actions.Replace do
              Boundary.fetch(store, params.resource_id, :capture, params.capture_ref),
            {:ok, revision} <-
              Boundary.fetch(store, params.resource_id, :revision, params.revision_ref),
-           {:ok, next} <- Jido.Workspace.replace(ws, capture, expected: revision) do
+           {:ok, next} <- Jido.Realm.Host.replace(ws, capture, expected: revision) do
         {:ok, %{revision_ref: Boundary.put(store, params.resource_id, :revision, next)}}
       end
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Exec do
+defmodule Jido.Realm.Host.TestSupport.Actions.Exec do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
 
   use Jido.Action,
     name: "workspace_test_exec",
@@ -338,16 +338,16 @@ defmodule Jido.Workspace.TestSupport.Actions.Exec do
   def run(params, context) do
     Boundary.perform(params, context, :sandbox, fn sandbox, _store ->
       with {:ok, execution} <-
-             Jido.Workspace.Sandbox.exec(sandbox, params.executable, params.args) do
+             Jido.Realm.Host.Sandbox.exec(sandbox, params.executable, params.args) do
         {:ok, Map.take(execution, [:output, :exit_status, :truncated])}
       end
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Prepare do
+defmodule Jido.Realm.Host.TestSupport.Actions.Prepare do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
 
   use Jido.Action,
     name: "workspace_test_prepare",
@@ -357,16 +357,16 @@ defmodule Jido.Workspace.TestSupport.Actions.Prepare do
     Boundary.perform(params, context, :deployment, fn session, store ->
       with {:ok, artifact} <-
              Boundary.fetch(store, params.resource_id, :artifact, params.artifact_ref),
-           {:ok, plan} <- Jido.Workspace.Deploy.prepare(session, artifact) do
+           {:ok, plan} <- Jido.Realm.Host.Deploy.prepare(session, artifact) do
         {:ok, %{plan_ref: Boundary.put(store, params.resource_id, :plan, plan)}}
       end
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Apply do
+defmodule Jido.Realm.Host.TestSupport.Actions.Apply do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
 
   use Jido.Action,
     name: "workspace_test_apply",
@@ -375,15 +375,15 @@ defmodule Jido.Workspace.TestSupport.Actions.Apply do
   def run(params, context) do
     Boundary.perform(params, context, :deployment, fn session, store ->
       with {:ok, plan} <- Boundary.fetch(store, params.resource_id, :plan, params.plan_ref),
-           {:ok, id} <- Jido.Workspace.Deploy.apply(session, plan),
+           {:ok, id} <- Jido.Realm.Host.Deploy.apply(session, plan),
            do: {:ok, %{operation_id: id}}
     end)
   end
 end
 
-defmodule Jido.Workspace.TestSupport.Actions.Await do
+defmodule Jido.Realm.Host.TestSupport.Actions.Await do
   @moduledoc false
-  alias Jido.Workspace.TestSupport.ActionBoundary, as: Boundary
+  alias Jido.Realm.Host.TestSupport.ActionBoundary, as: Boundary
 
   use Jido.Action,
     name: "workspace_test_await",
@@ -391,7 +391,7 @@ defmodule Jido.Workspace.TestSupport.Actions.Await do
 
   def run(params, context) do
     Boundary.perform(params, context, :deployment, fn session, _store ->
-      with {:ok, record} <- Jido.Workspace.Deploy.await(session, params.operation_id) do
+      with {:ok, record} <- Jido.Realm.Host.Deploy.await(session, params.operation_id) do
         {:ok,
          %{
            operation_id: record.id,
@@ -406,9 +406,9 @@ defmodule Jido.Workspace.TestSupport.Actions.Await do
   end
 end
 
-defmodule Jido.Workspace.TestSupport.BoundaryAgent do
+defmodule Jido.Realm.Host.TestSupport.BoundaryAgent do
   @moduledoc "A fixed Jido Agent for API integration evidence. It does not use a model."
-  alias Jido.Workspace.TestSupport.Actions
+  alias Jido.Realm.Host.TestSupport.Actions
 
   use Jido.Agent, name: "workspace_boundary_test"
 
@@ -417,79 +417,79 @@ defmodule Jido.Workspace.TestSupport.BoundaryAgent do
   end
 
   routes do
-    route "jido.workspace.v1.workspace.write.requested", Actions.Write do
+    route "realm.host.v1.write.requested", Actions.Write do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.read.requested", Actions.Read do
+    route "realm.host.v1.read.requested", Actions.Read do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.mkdir.requested", Actions.Mkdir do
+    route "realm.host.v1.mkdir.requested", Actions.Mkdir do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.delete.requested", Actions.Delete do
+    route "realm.host.v1.delete.requested", Actions.Delete do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.close.requested", Actions.Close do
+    route "realm.host.v1.close.requested", Actions.Close do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.run.requested", Actions.Run do
+    route "realm.host.v1.run.requested", Actions.Run do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.info.requested", Actions.Info do
+    route "realm.host.v1.info.requested", Actions.Info do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.list.requested", Actions.List do
+    route "realm.host.v1.list.requested", Actions.List do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.file_view.requested", Actions.FileView do
+    route "realm.host.v1.file_view.requested", Actions.FileView do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.start_session.requested", Actions.StartSession do
+    route "realm.host.v1.start_session.requested", Actions.StartSession do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.stop_session.requested", Actions.StopSession do
+    route "realm.host.v1.stop_session.requested", Actions.StopSession do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.filesystem.requested", Actions.Filesystem do
+    route "realm.host.v1.filesystem.requested", Actions.Filesystem do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.shell.requested", Actions.Shell do
+    route "realm.host.v1.shell.requested", Actions.Shell do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.capture.requested", Actions.Capture do
+    route "realm.host.v1.capture.requested", Actions.Capture do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.workspace.replace.requested", Actions.Replace do
+    route "realm.host.v1.replace.requested", Actions.Replace do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.sandbox.exec.requested", Actions.Exec do
+    route "realm.host.v1.sandbox.exec.requested", Actions.Exec do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.deploy.prepare.requested", Actions.Prepare do
+    route "realm.host.v1.deploy.prepare.requested", Actions.Prepare do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.deploy.apply.requested", Actions.Apply do
+    route "realm.host.v1.deploy.apply.requested", Actions.Apply do
       state(:unchanged)
     end
 
-    route "jido.workspace.v1.deploy.await.requested", Actions.Await do
+    route "realm.host.v1.deploy.await.requested", Actions.Await do
       state(:unchanged)
     end
   end

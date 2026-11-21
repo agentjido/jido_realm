@@ -1,7 +1,7 @@
-# Workspace asset lifecycle proposal
+# Realm asset lifecycle proposal
 
 This document records an earlier proposal. The current workflow uses
-`Jido.Workspace.save/1` and `Jido.Workspace.open/1` with a saved reference.
+`Jido.Realm.Host.save/1` and `Jido.Realm.Host.open/1` with a saved reference.
 See [Open one working tree](../README.md#open-one-working-tree).
 
 ## Ownership and identity
@@ -16,7 +16,7 @@ Keep three identities with distinct uses:
 
 | Value | Use |
 | --- | --- |
-| Live Workspace handle | Access mounted files, apply policy, and manage execution. |
+| Live Realm handle | Access mounted files, apply policy, and manage execution. |
 | Live revision token | Check that a mutation or command starts with the expected content. A reopened workspace has a new token. |
 | Saved asset reference | Locate and verify an immutable saved file tree. It carries a format version, store identifier, and content digest. The host resolves and authorizes access to the store. |
 
@@ -30,19 +30,19 @@ branches belong to the source manager.
 These names and signatures are design candidates.
 
 ```elixir
-{:ok, workspace} = Jido.Workspace.open(policy: :workspace_write)
-:ok = Jido.Workspace.write(workspace, "/report.md", "Draft")
-{:ok, asset} = Jido.Workspace.save(workspace, store: :work_assets)
-:ok = Jido.Workspace.close(workspace)
+{:ok, workspace} = Jido.Realm.Host.open(policy: :workspace_write)
+:ok = Jido.Realm.Host.write(workspace, "/report.md", "Draft")
+{:ok, asset} = Jido.Realm.Host.save(workspace, store: :work_assets)
+:ok = Jido.Realm.Host.close(workspace)
 
 # A fresh process or node can use the same saved asset.
-{:ok, reopened} = Jido.Workspace.reopen(asset, policy: :read_only)
-{:ok, "Draft"} = Jido.Workspace.read(reopened, "/report.md")
-:ok = Jido.Workspace.close(reopened)
+{:ok, reopened} = Jido.Realm.Host.reopen(asset, policy: :read_only)
+{:ok, "Draft"} = Jido.Realm.Host.read(reopened, "/report.md")
+:ok = Jido.Realm.Host.close(reopened)
 ```
 
 - **Open and work.** Continue to use the existing file operations and virtual
-  Shell. Keep command and Sandbox capabilities explicit. Workspace execution
+  Shell. Keep command and Sandbox capabilities explicit. Realm execution
   observes its live file view. Sandbox execution uses an explicitly projected
   tree and records the asset reference and its separate execution result.
 - **Save.** Capture one atomic InMemory root through the existing VFS contract.
@@ -96,7 +96,7 @@ its previous value available. Delay named references until a consumer needs them
 
 | Event | Expected outcome |
 | --- | --- |
-| Workspace owner exits before any save | The sessions and mounted memory tree close. There is no saved asset for those edits. |
+| Realm owner exits before any save | The sessions and mounted memory tree close. There is no saved asset for those edits. |
 | Node stops during save before publication | A prior asset stays readable. A temporary write cannot appear as a valid saved reference. The store can clean unused temporary writes on restart. |
 | Node stops after save success | A fresh node can reopen the reference. Changes after the capture are absent. |
 | Save publishes and the caller loses the reply | A caller that holds the exact capture can retry for the same reference. Recovery without that capture requires a durable receipt. |

@@ -1,12 +1,12 @@
-defmodule Jido.Workspace.Integration.Scenario05VFSMultiMountArtifactRoutingTest do
+defmodule Jido.Realm.Host.Integration.Scenario05VFSMultiMountArtifactRoutingTest do
   use ExUnit.Case, async: false
 
   @moduledoc """
   Scenario 05 goal: Mount multiple filesystems and prove path routing works correctly.
   """
 
-  alias Jido.Workspace
-  alias Jido.Workspace.TestSupport.ScenarioHelpers
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.TestSupport.ScenarioHelpers
 
   @moduletag :integration
   @moduletag :local_integration
@@ -52,7 +52,7 @@ defmodule Jido.Workspace.Integration.Scenario05VFSMultiMountArtifactRoutingTest 
 
       assert {:ok, "repo-data"} = Jido.Shell.VFS.read_file(workspace_id, "/repo/repo.txt")
 
-      assert :ok = Workspace.mkdir(workspace, "/artifacts")
+      assert :ok = Host.mkdir(workspace, "/artifacts")
       ScenarioHelpers.put_workspace(workspace)
 
       mounts =
@@ -83,8 +83,8 @@ defmodule Jido.Workspace.Integration.Scenario05VFSMultiMountArtifactRoutingTest 
           ]
         )
 
-      :ok = Workspace.write(workspace, @mounts_path, mounts_json)
-      :ok = Workspace.write(workspace, @summary_path, mounts_json)
+      :ok = Host.write(workspace, @mounts_path, mounts_json)
+      :ok = Host.write(workspace, @summary_path, mounts_json)
       ScenarioHelpers.put_workspace(workspace)
 
       mounts_file = Path.join(output_root, "artifacts/mounts.json")

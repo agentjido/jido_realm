@@ -1,20 +1,20 @@
 # 02.01 Run a command with argv and cwd
 
-Pass the tool and its arguments as a list to `Workspace.run/3`. Each
+Pass the tool and its arguments as a list to `Host.run/3`. Each
 element is literal. Spaces and shell metacharacters in a filename stay
 in that argument. Set `cwd:` to a directory relative to the workspace root.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
 directory = "monthly reports"
 filename = "draft $(echo changed).txt"
 
-:ok = Workspace.mkdir(workspace, directory)
-:ok = Workspace.write(workspace, Path.join(directory, filename), "Approved report\n")
+:ok = Host.mkdir(workspace, directory)
+:ok = Host.write(workspace, Path.join(directory, filename), "Approved report\n")
 
 {:ok, execution} =
-  Workspace.run(workspace, ["cat", filename, "missing.txt"],
+  Host.run(workspace, ["cat", filename, "missing.txt"],
     cwd: directory,
     output_limit: 1_024
   )

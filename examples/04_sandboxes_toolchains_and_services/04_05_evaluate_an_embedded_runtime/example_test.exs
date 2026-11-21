@@ -1,13 +1,13 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 
-defmodule Jido.Workspace.Examples.EmbeddedRuntimeTest do
+defmodule Jido.Realm.Host.Examples.EmbeddedRuntimeTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution}
-  import Jido.Workspace.Examples.LifecycleSupport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution}
+  import Jido.Realm.Host.Examples.LifecycleSupport
 
   @program Path.join(__DIR__, "report.lua")
   @draft "draft; Q4.txt"
@@ -20,13 +20,13 @@ defmodule Jido.Workspace.Examples.EmbeddedRuntimeTest do
 
   setup %{tmp_dir: root} do
     configure(Path.join(root, "snapshots"))
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
 
     lua = Map.merge(profiles.memory, %{tools: ["lua"], require: %{isolation: :mediated}})
     read_only = %{lua | policy: [:read, :execute, :import]}
 
     Application.put_env(
-      :jido_workspace,
+      :jido_realm,
       :profiles,
       Map.merge(profiles, %{lua: lua, read_only_lua: read_only})
     )
@@ -38,32 +38,30 @@ defmodule Jido.Workspace.Examples.EmbeddedRuntimeTest do
     snapshot =
       in_workspace([profile: :lua], fn workspace ->
         assert {:ok, %{capabilities: %{isolation: :mediated, network: :disabled}}} =
-                 Workspace.info(workspace)
+                 Host.info(workspace)
 
-        assert :ok = Workspace.mkdir(workspace, "build")
-        assert :ok = Workspace.write(workspace, "build/report.lua", File.read!(@program))
-        assert :ok = Workspace.write(workspace, "build/" <> @draft, "quarterly report\n")
+        assert :ok = Host.mkdir(workspace, "build")
+        assert :ok = Host.write(workspace, "build/report.lua", File.read!(@program))
+        assert :ok = Host.write(workspace, "build/" <> @draft, "quarterly report\n")
 
         assert {:ok, %Execution{status: :exited, exit_status: 0, output: "Lua 5.3\n"}} =
-                 Workspace.run(workspace, ["lua", "report.lua", @draft, "report.txt"],
-                   cwd: "build"
-                 )
+                 Host.run(workspace, ["lua", "report.lua", @draft, "report.txt"], cwd: "build")
 
-        assert {:ok, @report} = Workspace.read(workspace, "build/report.txt")
-        assert {:ok, snapshot} = Workspace.save(workspace)
+        assert {:ok, @report} = Host.read(workspace, "build/report.txt")
+        assert {:ok, snapshot} = Host.save(workspace)
         snapshot
       end)
 
     in_workspace([profile: :memory, from: snapshot], fn workspace ->
-      assert {:ok, @report} = Workspace.read(workspace, "build/report.txt")
+      assert {:ok, @report} = Host.read(workspace, "build/report.txt")
 
       assert {:error, %Error{code: :policy_denied}} =
-               Workspace.run(workspace, ["lua", "report.lua"])
+               Host.run(workspace, ["lua", "report.lua"])
     end)
 
     in_workspace([profile: :read_only_lua, from: snapshot], fn workspace ->
       assert {:error, %Error{code: :policy_denied}} =
-               Workspace.run(workspace, ["lua", "report.lua"], cwd: "build")
+               Host.run(workspace, ["lua", "report.lua"], cwd: "build")
     end)
   end
 
@@ -83,28 +81,28 @@ defmodule Jido.Workspace.Examples.EmbeddedRuntimeTest do
     """
 
     in_workspace([profile: :lua], fn workspace ->
-      assert :ok = Workspace.write(workspace, "check.lua", script)
+      assert :ok = Host.write(workspace, "check.lua", script)
 
       assert {:ok, %Execution{status: :exited, exit_status: 0}} =
-               Workspace.run(workspace, ["lua", "check.lua", fixture])
+               Host.run(workspace, ["lua", "check.lua", fixture])
 
-      assert {:ok, "inside"} = Workspace.read(workspace, "inside.txt")
+      assert {:ok, "inside"} = Host.read(workspace, "inside.txt")
       assert File.read!(fixture) == "outside"
     end)
   end
 
   test "cancel stops a busy loop and discards its staged changes" do
     in_workspace([profile: :lua], fn workspace ->
-      assert :ok = Workspace.write(workspace, "loop.lua", @loop)
+      assert :ok = Host.write(workspace, "loop.lua", @loop)
 
       task =
-        Task.async(fn -> Workspace.run(workspace, ["lua", "loop.lua"], timeout_ms: 5_000) end)
+        Task.async(fn -> Host.run(workspace, ["lua", "loop.lua"], timeout_ms: 5_000) end)
 
       id =
         await(
           fn ->
-            with {:ok, %{active_execution_id: id}} when is_binary(id) <- Workspace.info(workspace),
-                 {:ok, %{bytes: "ready\n", done?: false}} <- Workspace.output(workspace, id) do
+            with {:ok, %{active_execution_id: id}} when is_binary(id) <- Host.info(workspace),
+                 {:ok, %{bytes: "ready\n", done?: false}} <- Host.output(workspace, id) do
               id
             else
               _ -> nil
@@ -113,9 +111,9 @@ defmodule Jido.Workspace.Examples.EmbeddedRuntimeTest do
           "The Lua script did not reach its loop"
         )
 
-      assert {:error, %Error{code: :busy}} = Workspace.save(workspace)
-      assert {:error, %Error{code: :busy}} = Workspace.read(workspace, "pending.txt")
-      assert :ok = Workspace.cancel(workspace, id)
+      assert {:error, %Error{code: :busy}} = Host.save(workspace)
+      assert {:error, %Error{code: :busy}} = Host.read(workspace, "pending.txt")
+      assert :ok = Host.cancel(workspace, id)
 
       assert {:ok, %Execution{id: ^id, status: :cancelled, exit_status: nil, output: "ready\n"}} =
                Task.await(task)
@@ -126,7 +124,7 @@ defmodule Jido.Workspace.Examples.EmbeddedRuntimeTest do
 
   test "deadline stops a busy loop and retains its bounded output" do
     in_workspace([profile: :lua], fn workspace ->
-      assert :ok = Workspace.write(workspace, "loop.lua", @loop)
+      assert :ok = Host.write(workspace, "loop.lua", @loop)
 
       assert {:ok,
               %Execution{
@@ -136,10 +134,10 @@ defmodule Jido.Workspace.Examples.EmbeddedRuntimeTest do
                 output: "rea",
                 truncated: true
               }} =
-               Workspace.run(workspace, ["lua", "loop.lua"], timeout_ms: 1_000, output_limit: 3)
+               Host.run(workspace, ["lua", "loop.lua"], timeout_ms: 1_000, output_limit: 3)
 
       assert {:ok, %{bytes: "dy\n", dropped_bytes: 3, done?: true}} =
-               Workspace.output(workspace, id)
+               Host.output(workspace, id)
 
       assert_ready(workspace)
     end)
@@ -147,22 +145,22 @@ defmodule Jido.Workspace.Examples.EmbeddedRuntimeTest do
 
   test "script errors and invalid publish targets leave all staged files unchanged" do
     in_workspace([profile: :lua], fn workspace ->
-      assert :ok = Workspace.mkdir(workspace, "z-directory")
-      assert :ok = Workspace.write(workspace, "a.txt", "original")
+      assert :ok = Host.mkdir(workspace, "z-directory")
+      assert :ok = Host.write(workspace, "a.txt", "original")
 
       for suffix <- [~S[error("script failed")], ~S[workspace.write("z-directory", "invalid")]] do
         script = ~S[workspace.write("a.txt", "changed")] <> "\n" <> suffix
-        assert :ok = Workspace.write(workspace, "fail.lua", script)
+        assert :ok = Host.write(workspace, "fail.lua", script)
 
         assert {:ok, %Execution{status: :exited, exit_status: 1, output: output}} =
-                 Workspace.run(workspace, ["lua", "fail.lua"])
+                 Host.run(workspace, ["lua", "fail.lua"])
 
         assert output != ""
-        assert {:ok, "original"} = Workspace.read(workspace, "a.txt")
+        assert {:ok, "original"} = Host.read(workspace, "a.txt")
       end
 
       assert {:error, %Error{code: :start_failed}} =
-               Workspace.run(workspace, ["lua", "absent.lua"])
+               Host.run(workspace, ["lua", "absent.lua"])
 
       assert_ready(workspace)
     end)
@@ -176,31 +174,31 @@ defmodule Jido.Workspace.Examples.EmbeddedRuntimeTest do
     """
 
     in_workspace([profile: :lua], fn workspace ->
-      assert :ok = Workspace.write(workspace, "limit.lua", script)
+      assert :ok = Host.write(workspace, "limit.lua", script)
 
       assert {:ok, %Execution{exit_status: 1, output: output}} =
-               Workspace.run(workspace, ["lua", "limit.lua"])
+               Host.run(workspace, ["lua", "limit.lua"])
 
       assert output =~ "draft limit"
-      assert {:error, %Error{code: :not_found}} = Workspace.read(workspace, "first.txt")
-      assert {:error, %Error{code: :not_found}} = Workspace.read(workspace, "second.txt")
+      assert {:error, %Error{code: :not_found}} = Host.read(workspace, "first.txt")
+      assert {:error, %Error{code: :not_found}} = Host.read(workspace, "second.txt")
     end)
   end
 
   defp assert_ready(workspace) do
-    assert {:ok, %{phase: :ready}} = Workspace.info(workspace)
-    assert {:error, %Error{code: :not_found}} = Workspace.read(workspace, "pending.txt")
-    assert :ok = Workspace.write(workspace, "review.txt", "reviewed")
-    assert {:ok, %{kind: "snapshot"}} = Workspace.save(workspace)
+    assert {:ok, %{phase: :ready}} = Host.info(workspace)
+    assert {:error, %Error{code: :not_found}} = Host.read(workspace, "pending.txt")
+    assert :ok = Host.write(workspace, "review.txt", "reviewed")
+    assert {:ok, %{kind: "snapshot"}} = Host.save(workspace)
   end
 
   defp in_workspace(opts, fun) do
-    assert {:ok, workspace} = Workspace.open(opts)
+    assert {:ok, workspace} = Host.open(opts)
 
     try do
       fun.(workspace)
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 end

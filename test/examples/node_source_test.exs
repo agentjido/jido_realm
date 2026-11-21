@@ -1,9 +1,9 @@
-defmodule Jido.Workspace.Deploy.NodeSourceTest do
+defmodule Jido.Realm.Host.Deploy.NodeSourceTest do
   use ExUnit.Case, async: false
   @moduletag :integration
-  alias Jido.Workspace.Deploy
-  alias Jido.Workspace.Deploy.Test.NodeApp
-  alias Jido.Workspace.Sandbox
+  alias Jido.Realm.Host.Deploy
+  alias Jido.Realm.Host.Deploy.Test.NodeApp
+  alias Jido.Realm.Host.Sandbox
 
   setup do
     {:ok, sandbox} = Sandbox.open()

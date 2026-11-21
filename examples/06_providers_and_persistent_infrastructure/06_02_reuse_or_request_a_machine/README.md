@@ -1,6 +1,6 @@
 # 06.02 Reuse a persistent machine or request a fresh one
 
-Keep a machine and its working files after a Workspace session closes.
+Keep a machine and its working files after a Realm session closes.
 The host requests a machine, records its infrastructure reference, and
 opens a session on that reference. Reopen the same reference to reuse
 the machine. Request a fresh machine with a new request ID.
@@ -15,21 +15,21 @@ provider's lease checks. Use an installed `alpine:3.20` image.
 Use the sample host's `MachinePool.request/2` to obtain a machine
 reference. It returns the same identity for a repeat request ID in the
 same pool. The host can store the reference as JSON before it opens the
-Workspace session.
+Realm session.
 
 ```elixir
 directory = "examples/06_providers_and_persistent_infrastructure/06_02_reuse_or_request_a_machine"
 Code.require_file(Path.join(directory, "machine_pool.ex"))
 Code.require_file(Path.join(directory, "machine_provider.ex"))
 
-alias Jido.Workspace
-alias Jido.Workspace.Examples.{MachinePool, MachineProvider}
+alias Jido.Realm.Host
+alias Jido.Realm.Host.Examples.{MachinePool, MachineProvider}
 
 suffix = Base.encode16(:crypto.strong_rand_bytes(12), case: :lower)
 root = Path.join(System.tmp_dir!(), "jido-machine-example-" <> suffix)
 {:ok, pool} = MachinePool.start(root, "alpine:3.20")
 
-Application.put_env(:jido_workspace, :profiles, %{
+Application.put_env(:jido_realm, :profiles, %{
   build: %{
     provider: {MachineProvider, %{pool: pool}},
     infrastructure: MachinePool.provider(),
@@ -42,32 +42,32 @@ Application.put_env(:jido_workspace, :profiles, %{
 try do
   {:ok, machine} = MachinePool.request(pool, "build-1")
   serialized = Jason.encode!(machine)
-  {:ok, workspace} = Workspace.open(profile: :build, infrastructure: machine)
+  {:ok, workspace} = Host.open(profile: :build, infrastructure: machine)
 
   try do
-    :ok = Workspace.write(workspace, "build/report.txt", "draft\n")
+    :ok = Host.write(workspace, "build/report.txt", "draft\n")
   after
-    :ok = Workspace.close(workspace)
+    :ok = Host.close(workspace)
   end
 
-  {:ok, reopened} = Workspace.open(profile: :build, infrastructure: Jason.decode!(serialized))
+  {:ok, reopened} = Host.open(profile: :build, infrastructure: Jason.decode!(serialized))
 
   try do
-    {:ok, %{infrastructure: ^machine}} = Workspace.info(reopened)
+    {:ok, %{infrastructure: ^machine}} = Host.info(reopened)
     {:ok, %{exit_status: 0, output: "draft\n"}} =
-      Workspace.run(reopened, ["read", "report.txt"], cwd: "build")
+      Host.run(reopened, ["read", "report.txt"], cwd: "build")
   after
-    :ok = Workspace.close(reopened)
+    :ok = Host.close(reopened)
   end
 
   {:ok, fresh} = MachinePool.request(pool, "build-2")
   true = fresh.resource_id != machine.resource_id
-  {:ok, blank} = Workspace.open(profile: :build, infrastructure: fresh)
+  {:ok, blank} = Host.open(profile: :build, infrastructure: fresh)
 
   try do
-    {:error, %{code: :not_found}} = Workspace.read(blank, "build/report.txt")
+    {:error, %{code: :not_found}} = Host.read(blank, "build/report.txt")
   after
-    :ok = Workspace.close(blank)
+    :ok = Host.close(blank)
   end
 after
   :ok = MachinePool.destroy(pool)
@@ -78,7 +78,7 @@ end
 ## Check ownership and failure
 
 - The profile names the provider namespace. Before it returns a handle,
-  Workspace validates the reference and checks the identity that the
+  Realm validates the reference and checks the identity that the
   provider reports. The provider also checks access to the resource.
 - The provider acquires a new session lease on each open. A lease in use
   returns `:infrastructure_busy`. Releasing an attempted lease leaves
@@ -94,7 +94,7 @@ end
 The fixture registry runs in the host BEAM. These tests prove session
 close, owner exit, and machine reuse on a local Docker engine. A provider
 for remote machines must maintain resource and writer state outside the
-Workspace controller so a fresh BEAM can recover safely.
+Realm controller so a fresh BEAM can recover safely.
 
 ## Run the integration tests
 

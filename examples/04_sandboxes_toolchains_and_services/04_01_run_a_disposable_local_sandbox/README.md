@@ -8,7 +8,7 @@ Configure a snapshot store named `"reports"` and add a profile for the
 copy command. [Snapshot store setup](../../README.md#save-and-reopen-after-a-beam-restart)
 
 ```elixir
-config :jido_workspace,
+config :jido_realm,
   profiles: %{
     local_report: %{
       provider: :local,
@@ -25,22 +25,22 @@ The example writes the input, runs `/bin/cp`, and saves the result
 when the command exits successfully. [Copy and save](example.ex)
 
 ```elixir
-alias Jido.Workspace
-alias Jido.Workspace.Examples.DisposableSandbox
+alias Jido.Realm.Host
+alias Jido.Realm.Host.Examples.DisposableSandbox
 
-{:ok, workspace} = Workspace.open(profile: :local_report)
+{:ok, workspace} = Host.open(profile: :local_report)
 
 snapshot =
   try do
     {:ok, saved} = DisposableSandbox.copy_report(workspace, "Checked report\n")
     saved
   after
-    :ok = Workspace.close(workspace)
+    :ok = Host.close(workspace)
   end
 
-{:ok, restored} = Workspace.open(profile: :local_report, from: snapshot)
-{:ok, "Checked report\n"} = Workspace.read(restored, "report.txt")
-:ok = Workspace.close(restored)
+{:ok, restored} = Host.open(profile: :local_report, from: snapshot)
+{:ok, "Checked report\n"} = Host.read(restored, "report.txt")
+:ok = Host.close(restored)
 ```
 
 ## Select the provider in the profile
@@ -54,7 +54,7 @@ rejects a request for container isolation or disabled networking.
 
 Local reports `cancellation: :direct_child`. On timeout or cancellation,
 it waits for the port to report that the directly spawned process
-exited. If it cannot confirm the stop, Workspace fences the tree.
+exited. If it cannot confirm the stop, Realm fences the tree.
 Losing the port can leave the process alive. In that case, close returns
 `:cleanup_unconfirmed` and leaves the root for the host.
 The host is responsible for the behavior of any child that the tool
@@ -67,7 +67,7 @@ image. Set `provider: :docker` and
 Docker provides its own filesystem and network boundary and stops the whole
 container. Memory can reopen the saved file tree and use virtual tools.
 
-Use `Workspace.close/1` for a profiled workspace. If the host uses the
+Use `Host.close/1` for a profiled workspace. If the host uses the
 lower-level Sandbox API, `Sandbox.destroy/1` releases the resources and
 `Sandbox.close/1` leaves them available for `Sandbox.attach/1`.
 [Sandbox ownership](../../../SANDBOX.md#ownership)

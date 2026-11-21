@@ -1,6 +1,6 @@
-# Jido Workspace examples
+# Jido Realm examples
 
-The examples show how to use `jido_workspace`. Each runnable example has an
+The examples show how to use `jido_realm`. Each runnable example has an
 integration test for a result that the caller can observe.
 
 Start with the [use-case matrix](table_of_contents.md#use-case-matrix). Each
@@ -11,7 +11,7 @@ the same.
 
 ## Start here
 
-The [four core examples](00_core/README.md) use `Jido.Workspace` for files,
+The [four core examples](00_core/README.md) use `Jido.Realm.Host` for files,
 commands, access policy, and snapshots. The report workflow uses the same
 calls on memory and Docker. The host selects the provider with a named
 profile.
@@ -44,7 +44,7 @@ The next lifecycle example bounds the caller's wait while an accepted
 command or save finishes. [Close while work is running](05_lifecycle/05_02_race_close_with_work/README.md)
 
 An allocation can also outlast the caller. Retry from the saved snapshot
-while Workspace releases the disposable tree. [Recover a late or failed allocation](05_lifecycle/05_03_recover_failed_open/README.md)
+while Realm releases the disposable tree. [Recover a late or failed allocation](05_lifecycle/05_03_recover_failed_open/README.md)
 
 Check the workspace phase and match an active command to its result or
 error event with the execution ID. [Inspect workspace and command state](05_lifecycle/05_04_inspect_state/README.md)
@@ -129,7 +129,7 @@ reference, or ask the host for a fresh machine with a separate tree.
 
 Record a command reference before launch. Use a recovery profile to
 inspect, wait for, or stop the command after losing the launch reply or
-the Workspace BEAM.
+the Realm BEAM.
 [Recover an old command](06_providers_and_persistent_infrastructure/06_03_recover_an_old_command/README.md)
 
 Revoke a lease at the provider and verify that its old commands have
@@ -138,7 +138,7 @@ connection loss.
 [Block a stale writer](06_providers_and_persistent_infrastructure/06_04_block_a_stale_writer/README.md)
 
 Give a local provider console the writer slot. Stop its processes and
-remove its access before a new Workspace saves the reviewed tree.
+remove its access before a new Realm saves the reviewed tree.
 [Hand off to an external maintainer](06_providers_and_persistent_infrastructure/06_05_hand_off_to_an_external_maintainer/README.md)
 
 Save a memory candidate to a directory store and review the exact saved
@@ -195,14 +195,14 @@ same store ID and directory. The Docker profile needs a local Docker engine
 and an installed `alpine:3.20` image.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
 root = System.fetch_env!("WORKSPACE_EXAMPLE_DIR")
 reference_path = Path.join(root, "report.snapshot.json")
 
-Application.put_env(:jido_workspace, :stores, %{"reports" => Path.join(root, "snapshots")})
+Application.put_env(:jido_realm, :stores, %{"reports" => Path.join(root, "snapshots")})
 
-Application.put_env(:jido_workspace, :profiles, %{
+Application.put_env(:jido_realm, :profiles, %{
   memory: %{provider: :memory, policy: :full_access, store: "reports"},
   docker: %{
     provider: :docker,
@@ -214,15 +214,15 @@ Application.put_env(:jido_workspace, :profiles, %{
 })
 ```
 
-In the first session, write the report and save the tree. Workspace writes
+In the first session, write the report and save the tree. Realm writes
 the file data to `snapshots/`. Keep the reference as a JSON file.
 
 ```elixir
-{:ok, workspace} = Workspace.open(profile: :memory)
-:ok = Workspace.write(workspace, "report.txt", "Report for today\n")
-{:ok, snapshot} = Workspace.save(workspace)
+{:ok, workspace} = Host.open(profile: :memory)
+:ok = Host.write(workspace, "report.txt", "Report for today\n")
+{:ok, snapshot} = Host.save(workspace)
 :ok = File.write(reference_path, Jason.encode!(snapshot))
-:ok = Workspace.close(workspace)
+:ok = Host.close(workspace)
 ```
 
 Exit IEx. Start a new `iex -S mix` in the same terminal and paste the host
@@ -230,9 +230,9 @@ configuration again. Read the reference and open the saved tree.
 
 ```elixir
 snapshot = reference_path |> File.read!() |> Jason.decode!()
-{:ok, workspace} = Workspace.open(profile: :memory, from: snapshot)
-{:ok, "Report for today\n"} = Workspace.read(workspace, "report.txt")
-:ok = Workspace.close(workspace)
+{:ok, workspace} = Host.open(profile: :memory, from: snapshot)
+{:ok, "Report for today\n"} = Host.read(workspace, "report.txt")
+:ok = Host.close(workspace)
 ```
 
 To reopen the same tree on Docker, use `profile: :docker` in the open call.
@@ -263,19 +263,19 @@ workflow.
 
 ## Local and provider-backed tests
 
-The default examples should run offline with real Workspace processes,
+The default examples should run offline with real Realm processes,
 temporary directories, and deterministic inputs. Use a local provider fixture
-to test how Workspace handles provider replies and failures. Verify actual
+to test how Realm handles provider replies and failures. Verify actual
 containment, resource cleanup, and remote recovery with the provider that makes
 those guarantees.
 
 Keep real Docker, remote machines, and other external infrastructure opt-in.
 Document the runtime, configuration, credentials, possible costs, timeout,
 and cleanup. Use resources dedicated to the test. In a persistence example,
-check that the machine survives Workspace close before the test harness
+check that the machine survives Realm close before the test harness
 releases its own fixture.
 
-## Run the numbered examples
+## Run the example suites
 
 From the repository root, run the numbered examples.
 
@@ -283,18 +283,20 @@ From the repository root, run the numbered examples.
 mix test.examples --warnings-as-errors
 ```
 
-To run all the container examples, use a local Docker engine with
-`alpine:3.20` and the pinned Python image installed. The host installs
-these test fixtures before running the examples.
-[Install the Python image](04_sandboxes_toolchains_and_services/04_04_use_a_pinned_language_toolchain/README.md#install-the-image)
+For the full Realm suite, start Docker with the `alpine:3.20` and
+pinned Python images available. On a supported Mac, start Apple Container
+with the `alpine:latest` image available. Put the MinIO executable on
+`PATH` to enable the S3 fixture.
+[Python image](04_sandboxes_toolchains_and_services/04_04_use_a_pinned_language_toolchain/README.md#install-the-image) ·
+[Apple Container example](04_sandboxes_toolchains_and_services/04_07_run_on_apple_container/README.md) ·
+[MinIO fixture](07_keep_useful_results/07_03_store_a_selected_artifact_in_s3/README.md#run-the-integration-tests)
 
 ```sh
-JIDO_SANDBOX_DOCKER=1 JIDO_SANDBOX_IMAGE=alpine:3.20 mix test.examples --warnings-as-errors
+JIDO_SANDBOX_DOCKER=1 JIDO_SANDBOX_APPLE=1 JIDO_SANDBOX_IMAGE=alpine:3.20 \
+  MIX_ENV=test mix test.integration --include s3
 ```
 
-To include the S3 tests, put the local MinIO executable on `PATH` and add
-`--include s3` to the command. [Set up the MinIO fixture](07_keep_useful_results/07_03_store_a_selected_artifact_in_s3/README.md#run-the-integration-tests)
-
-For a focused run, use the test command in the lesson README.
 `mix test.integration` runs both the numbered examples and the existing
-tests under `test/examples/`.
+tests under `test/examples/`. For a focused run, use the test command in
+the lesson README. Run the [Realm example suite](realm/README.md) with
+`mix test.realm`.

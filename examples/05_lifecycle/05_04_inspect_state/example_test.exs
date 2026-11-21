@@ -1,23 +1,23 @@
 Code.require_file("../support.exs", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.ObserveCommandTest do
+defmodule Jido.Realm.Host.Examples.ObserveCommandTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution, Info}
-  alias Jido.Workspace.Examples.ObserveCommand
-  import Jido.Workspace.Examples.LifecycleSupport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution, Info}
+  alias Jido.Realm.Host.Examples.ObserveCommand
+  import Jido.Realm.Host.Examples.LifecycleSupport
 
   setup %{tmp_dir: root} do
     configure(root)
 
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
 
     Application.put_env(
-      :jido_workspace,
+      :jido_realm,
       :profiles,
       Map.merge(profiles, %{
         memory_reader: %{profiles.memory | policy: :read_only},
@@ -30,7 +30,7 @@ defmodule Jido.Workspace.Examples.ObserveCommandTest do
 
   test "the active ID identifies both the memory command result and its stop event" do
     workspace = open(:memory)
-    assert :ok = Workspace.write(workspace, "report.txt", "Saved report")
+    assert :ok = Host.write(workspace, "report.txt", "Saved report")
     {_controller, memory} = provider(workspace, :memory)
     subscribe(workspace)
     assert :ok = :sys.suspend(memory.lifetime)
@@ -38,7 +38,7 @@ defmodule Jido.Workspace.Examples.ObserveCommandTest do
     {task, id} =
       try do
         task =
-          Task.async(fn -> Workspace.run(workspace, ["cat", "report.txt"], output_limit: 5) end)
+          Task.async(fn -> Host.run(workspace, ["cat", "report.txt"], output_limit: 5) end)
 
         id = active_command(workspace)
         {task, id}
@@ -66,7 +66,7 @@ defmodule Jido.Workspace.Examples.ObserveCommandTest do
     assert :ok = :sys.suspend(memory.lifetime)
 
     try do
-      task = Task.async(fn -> Workspace.run(workspace, ["cat", "report.txt"]) end)
+      task = Task.async(fn -> Host.run(workspace, ["cat", "report.txt"]) end)
       id = active_command(workspace)
       assert %{job: %{task: %{pid: worker}}} = :sys.get_state(controller)
       assert Process.exit(worker, :kill)
@@ -77,12 +77,12 @@ defmodule Jido.Workspace.Examples.ObserveCommandTest do
       assert_error_event(workspace, id, :quiescence_unknown)
 
       assert {:ok, %Info{phase: :quiescence_unknown, active_execution_id: nil}} =
-               Workspace.info(workspace)
+               Host.info(workspace)
 
       assert {:error, %Error{code: :quiescence_unknown}} =
-               Workspace.write(workspace, "report.txt", "Blocked")
+               Host.write(workspace, "report.txt", "Blocked")
 
-      assert {:error, %Error{code: :quiescence_unknown}} = Workspace.save(workspace)
+      assert {:error, %Error{code: :quiescence_unknown}} = Host.save(workspace)
     after
       :sys.resume(memory.lifetime)
     end
@@ -102,7 +102,7 @@ defmodule Jido.Workspace.Examples.ObserveCommandTest do
 
     task =
       Task.async(fn ->
-        Workspace.run(
+        Host.run(
           workspace,
           [
             "sh",
@@ -149,7 +149,7 @@ defmodule Jido.Workspace.Examples.ObserveCommandTest do
   end
 
   defp open(profile) do
-    assert {:ok, workspace} = Workspace.open(profile: profile)
+    assert {:ok, workspace} = Host.open(profile: profile)
     assert_ready(workspace)
     workspace
   end
@@ -161,7 +161,7 @@ defmodule Jido.Workspace.Examples.ObserveCommandTest do
 
   defp active_command(workspace) do
     id = assert_start(workspace)
-    assert {:ok, %Info{phase: :running, active_execution_id: ^id}} = Workspace.info(workspace)
+    assert {:ok, %Info{phase: :running, active_execution_id: ^id}} = Host.info(workspace)
     id
   end
 
@@ -187,7 +187,7 @@ defmodule Jido.Workspace.Examples.ObserveCommandTest do
 
   defp assert_admitted_failure(workspace) do
     assert {:error, %Error{code: :not_found, operation: :run, details: details}} =
-             Workspace.run(workspace, ["cat", "report.txt"], cwd: "missing-directory")
+             Host.run(workspace, ["cat", "report.txt"], cwd: "missing-directory")
 
     id = assert_start(workspace)
     assert %{execution_id: ^id} = details
@@ -210,22 +210,22 @@ defmodule Jido.Workspace.Examples.ObserveCommandTest do
   defp assert_read_only(profile) do
     workspace = open(profile)
     subscribe(workspace)
-    assert {:ok, %Info{policy: :read_only, phase: :ready}} = Workspace.info(workspace)
-    assert {:error, %Error{code: :policy_denied}} = Workspace.write(workspace, "report.txt", "X")
+    assert {:ok, %Info{policy: :read_only, phase: :ready}} = Host.info(workspace)
+    assert {:error, %Error{code: :policy_denied}} = Host.write(workspace, "report.txt", "X")
 
     assert {:error, %Error{code: :policy_denied}} =
-             Workspace.run(workspace, ["cat", "report.txt"])
+             Host.run(workspace, ["cat", "report.txt"])
 
     refute_received {:workspace_command, _, _, _}
     assert_closed(workspace)
   end
 
   defp assert_ready(workspace) do
-    assert {:ok, %Info{phase: :ready, active_execution_id: nil}} = Workspace.info(workspace)
+    assert {:ok, %Info{phase: :ready, active_execution_id: nil}} = Host.info(workspace)
   end
 
   defp assert_closed(workspace) do
-    assert :ok = Workspace.close(workspace)
-    assert {:error, %Error{code: :closed}} = Workspace.info(workspace)
+    assert :ok = Host.close(workspace)
+    assert {:error, %Error{code: :closed}} = Host.info(workspace)
   end
 end

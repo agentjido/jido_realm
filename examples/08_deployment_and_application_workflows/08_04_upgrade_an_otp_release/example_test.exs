@@ -1,14 +1,14 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 
-defmodule Jido.Workspace.Examples.OTPUpgradeTest do
+defmodule Jido.Realm.Host.Examples.OTPUpgradeTest do
   use ExUnit.Case, async: false
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Deploy, Sandbox}
-  alias Jido.Workspace.Deploy.{Artifact, OTP, Snapshot}
-  alias Jido.Workspace.Deploy.Test.Releases
-  alias Jido.Workspace.Examples.LifecycleSupport
-  alias Jido.Workspace.TestSupport.TargetCoverage
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Deploy, Sandbox}
+  alias Jido.Realm.Host.Deploy.{Artifact, OTP, Snapshot}
+  alias Jido.Realm.Host.Deploy.Test.Releases
+  alias Jido.Realm.Host.Examples.LifecycleSupport
+  alias Jido.Realm.Host.TestSupport.TargetCoverage
 
   @moduletag :integration
   @moduletag :tmp_dir
@@ -16,9 +16,9 @@ defmodule Jido.Workspace.Examples.OTPUpgradeTest do
 
   setup %{tmp_dir: root} do
     LifecycleSupport.configure(Path.join(root, "snapshots"))
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
     reader = %{profiles.memory | policy: :read_only}
-    Application.put_env(:jido_workspace, :profiles, Map.put(profiles, :reader, reader))
+    Application.put_env(:jido_realm, :profiles, Map.put(profiles, :reader, reader))
     %{fixtures: Releases.build(Path.join(root, "build"))}
   end
 
@@ -128,17 +128,17 @@ defmodule Jido.Workspace.Examples.OTPUpgradeTest do
   end
 
   defp save_release(profile, artifact) do
-    assert {:ok, workspace} = Workspace.open(profile: profile)
+    assert {:ok, workspace} = Host.open(profile: profile)
 
     try do
       for {path, %{bytes: bytes}} <- artifact.snapshot.entries do
-        assert :ok = Workspace.write(workspace, path, bytes)
+        assert :ok = Host.write(workspace, path, bytes)
       end
 
-      assert {:ok, reference} = Workspace.save(workspace)
+      assert {:ok, reference} = Host.save(workspace)
       reference
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 

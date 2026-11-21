@@ -2,14 +2,14 @@ Code.require_file("../../bench/search/support.exs", __DIR__)
 Code.require_file("../../bench/search/probes.exs", __DIR__)
 Code.require_file("../../bench/search/real_support.exs", __DIR__)
 
-defmodule Jido.Workspace.Integration.SearchSpikeTest do
+defmodule Jido.Realm.Host.Integration.SearchSpikeTest do
   use ExUnit.Case, async: false
-  alias Jido.Workspace
+  alias Jido.Realm.Host
   @moduletag :integration
   @moduletag :search_spike
 
   test "binary and parallel probes preserve line results on a frozen view" do
-    {:ok, workspace} = Workspace.open()
+    {:ok, workspace} = Host.open()
 
     try do
       for {path, content} <- [
@@ -19,7 +19,7 @@ defmodule Jido.Workspace.Integration.SearchSpikeTest do
             {"/blank.txt", "\n"},
             {"/utf8.txt", "café a.b\nother\n"}
           ] do
-        :ok = Workspace.write(workspace, path, content)
+        :ok = Host.write(workspace, path, content)
       end
 
       frozen = SearchSpike.Probes.snapshot(workspace.id)
@@ -62,11 +62,11 @@ defmodule Jido.Workspace.Integration.SearchSpikeTest do
         end
       end
 
-      :ok = Workspace.write(workspace, "/a.txt", "changed\n")
+      :ok = Host.write(workspace, "/a.txt", "changed\n")
       assert {"/a.txt", "a.b\naXb\na.b a.b\n\n"} in frozen
       refute frozen == SearchSpike.Probes.snapshot(workspace.id)
     after
-      Workspace.close(workspace)
+      Host.close(workspace)
     end
   end
 
@@ -93,13 +93,13 @@ defmodule Jido.Workspace.Integration.SearchSpikeTest do
   end
 
   test "search returns full lines through a Shell session with memory files" do
-    {:ok, workspace} = Workspace.open()
+    {:ok, workspace} = Host.open()
 
     try do
-      :ok = Workspace.mkdir(workspace, "/nested")
-      :ok = Workspace.write(workspace, "/nested/a.txt", "a.b\naXb\na.b a.b\n\n")
-      :ok = Workspace.write(workspace, "/last.txt", "a.b")
-      {:ok, session} = Workspace.start_session(workspace, backend: {SearchSpike.Backend, %{}})
+      :ok = Host.mkdir(workspace, "/nested")
+      :ok = Host.write(workspace, "/nested/a.txt", "a.b\naXb\na.b a.b\n\n")
+      :ok = Host.write(workspace, "/last.txt", "a.b")
+      {:ok, session} = Host.start_session(workspace, backend: {SearchSpike.Backend, %{}})
 
       assert {:ok, literal} = Jido.Shell.Agent.run(session, "grep literal a.b")
 
@@ -123,7 +123,7 @@ defmodule Jido.Workspace.Integration.SearchSpikeTest do
       assert empty_line == "./nested/a.txt:4:\n"
       assert {:error, _} = Jido.Shell.Agent.run(session, "grep regex [")
     after
-      Workspace.close(workspace)
+      Host.close(workspace)
     end
   end
 end

@@ -1,29 +1,29 @@
-defmodule Jido.Workspace.Deploy.OTPFailureTest do
+defmodule Jido.Realm.Host.Deploy.OTPFailureTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag timeout: 90_000
-  alias Jido.Workspace.Deploy
-  alias Jido.Workspace.Deploy.OTP
-  alias Jido.Workspace.Sandbox
+  alias Jido.Realm.Host.Deploy
+  alias Jido.Realm.Host.Deploy.OTP
+  alias Jido.Realm.Host.Sandbox
 
   test "callback failure requires recovery; a node restart loses live process state" do
     {:ok, sandbox} = Sandbox.open()
     on_exit(fn -> Sandbox.destroy(sandbox) end)
-    artifacts = Jido.Workspace.Deploy.Test.Releases.build(Path.join(sandbox.root, "build"))
+    artifacts = Jido.Realm.Host.Deploy.Test.Releases.build(Path.join(sandbox.root, "build"))
     {:ok, target} = OTP.start(sandbox, "counter", artifacts["1"])
-    Jido.Workspace.TestSupport.TargetCoverage.start(target)
+    Jido.Realm.Host.TestSupport.TargetCoverage.start(target)
     {:ok, session} = Deploy.connect(target)
     {:ok, %{identity: before}} = Deploy.inspect(session)
     {:ok, {old_pid, ~c"1", _}} = OTP.call(target, :counter_server, :inspect, [])
     {:ok, %{count: 19}} = OTP.call(target, :counter_server, :add, [9])
     {:ok, plan} = Deploy.prepare(session, artifacts["3"])
-    Jido.Workspace.TestSupport.TargetCoverage.export(target)
+    Jido.Realm.Host.TestSupport.TargetCoverage.export(target)
     {:ok, id} = Deploy.apply(session, plan)
     assert {:ok, %{status: :recovery_required}} = Deploy.await(session, id)
 
     # OTP can restart after the point of no return. Reconnect is explicit.
     assert {:ok, ^target} = reconnect(target, 100)
-    Jido.Workspace.TestSupport.TargetCoverage.start(target)
+    Jido.Realm.Host.TestSupport.TargetCoverage.start(target)
     assert {:ok, %{identity: after_restart}} = Deploy.inspect(session)
     refute before.generation == after_restart.generation
 

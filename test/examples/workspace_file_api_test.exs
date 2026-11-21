@@ -1,21 +1,21 @@
-defmodule Jido.Workspace.FileApiIntegrationTest do
+defmodule Jido.Realm.Host.FileApiIntegrationTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag capture_log: true
 
-  alias Jido.Workspace
-  alias Jido.Workspace.Error
-  alias Jido.Workspace.TestSupport.{Actions, BoundaryAgent}
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.Error
+  alias Jido.Realm.Host.TestSupport.{Actions, BoundaryAgent}
 
   setup do
     assert {:ok, _} = Application.ensure_all_started(:jido)
     start_supervised!({Jido, name: __MODULE__.Runtime})
-    {:ok, ws} = Workspace.open(policy: :workspace_write)
-    {:ok, restricted} = Workspace.open(policy: :read_only)
+    {:ok, ws} = Host.open(policy: :workspace_write)
+    {:ok, restricted} = Host.open(policy: :read_only)
 
     on_exit(fn ->
-      Workspace.close(ws)
-      Workspace.close(restricted)
+      Host.close(ws)
+      Host.close(restricted)
     end)
 
     access = %{
@@ -48,7 +48,7 @@ defmodule Jido.Workspace.FileApiIntegrationTest do
       assert {:ok, %{path: "/src/input"}} =
                call(mode, :write, %{path: "/src/input", content: "second"}, ctx)
 
-      assert {:ok, "second"} = Workspace.read(handle, "/src/input")
+      assert {:ok, "second"} = Host.read(handle, "/src/input")
 
       assert {:ok, %{path: "/src/input"}} = call(mode, :delete, %{path: "/src/input"}, ctx)
       assert {:error, error} = call(mode, :read, %{path: "/src/input"}, ctx)
@@ -72,7 +72,7 @@ defmodule Jido.Workspace.FileApiIntegrationTest do
       assert error.code == :policy_denied
       assert error.operation == :write
       assert error.resource == ctx.restricted.id
-      assert {:error, %Error{code: :not_found}} = Workspace.read(ctx.restricted, "/blocked")
+      assert {:error, %Error{code: :not_found}} = Host.read(ctx.restricted, "/blocked")
       assert {:ok, %{closed: true}} = call(mode, :close, %{}, restricted)
       refute_receive {:signal, _}
     end
@@ -81,7 +81,7 @@ defmodule Jido.Workspace.FileApiIntegrationTest do
   defp call(:direct, operation, params, ctx) do
     case operation do
       :read ->
-        case Workspace.read(ctx.ws, params.path) do
+        case Host.read(ctx.ws, params.path) do
           {:ok, content} -> {:ok, %{path: params.path, content: content}}
           {:error, error} -> {:error, error}
         end
@@ -89,10 +89,10 @@ defmodule Jido.Workspace.FileApiIntegrationTest do
       _ ->
         result =
           case operation do
-            :mkdir -> Workspace.mkdir(ctx.ws, params.path)
-            :write -> Workspace.write(ctx.ws, params.path, params.content)
-            :delete -> Workspace.delete(ctx.ws, params.path)
-            :close -> Workspace.close(ctx.ws)
+            :mkdir -> Host.mkdir(ctx.ws, params.path)
+            :write -> Host.write(ctx.ws, params.path, params.content)
+            :delete -> Host.delete(ctx.ws, params.path)
+            :close -> Host.close(ctx.ws)
           end
 
         case result do
@@ -115,7 +115,7 @@ defmodule Jido.Workspace.FileApiIntegrationTest do
 
   defp call(:signal, operation, params, ctx) do
     params = parameters(params, ctx)
-    prefix = "jido.workspace.v1.workspace.#{operation}"
+    prefix = "realm.host.v1.#{operation}"
     request = Jido.Signal.new!(prefix <> ".requested", params, source: "/workspace/file-api-test")
 
     assert {:ok, turn} =

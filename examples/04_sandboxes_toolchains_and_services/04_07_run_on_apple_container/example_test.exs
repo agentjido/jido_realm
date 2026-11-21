@@ -1,7 +1,7 @@
 Code.require_file("example.ex", __DIR__)
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 
-defmodule Jido.Workspace.Examples.AppleContainerTest do
+defmodule Jido.Realm.Host.Examples.AppleContainerTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
@@ -9,14 +9,14 @@ defmodule Jido.Workspace.Examples.AppleContainerTest do
   if System.get_env("JIDO_SANDBOX_APPLE") != "1",
     do: @moduletag(skip: "Set JIDO_SANDBOX_APPLE=1 to run live Apple Container tests")
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution}
-  alias Jido.Workspace.Examples.AppleContainer
-  import Jido.Workspace.Examples.LifecycleSupport, only: [await: 3, configure: 1, provider: 2]
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution}
+  alias Jido.Realm.Host.Examples.AppleContainer
+  import Jido.Realm.Host.Examples.LifecycleSupport, only: [await: 3, configure: 1, provider: 2]
 
   setup %{tmp_dir: dir} do
     suffix = Base.encode16(:crypto.strong_rand_bytes(8), case: :lower)
-    image = "localhost/jido-workspace-apple-fixture:" <> suffix
+    image = "localhost/jido-realm-apple-fixture:" <> suffix
     source = System.get_env("JIDO_SANDBOX_APPLE_IMAGE", "alpine:latest")
     assert {_, 0} = cli(["image", "tag", source, image])
 
@@ -28,7 +28,7 @@ defmodule Jido.Workspace.Examples.AppleContainerTest do
     end)
 
     configure(Path.join(dir, "snapshots"))
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
 
     apple = %{
       provider: :apple_container,
@@ -47,7 +47,7 @@ defmodule Jido.Workspace.Examples.AppleContainerTest do
         apple_pids: %{apple | require: %{runtime_limits: %{pids: 256}}}
       })
 
-    Application.put_env(:jido_workspace, :profiles, profiles)
+    Application.put_env(:jido_realm, :profiles, profiles)
     %{image: image}
   end
 
@@ -56,19 +56,19 @@ defmodule Jido.Workspace.Examples.AppleContainerTest do
     {_controller, sandbox} = provider(workspace, :native)
 
     assert {:ok, %{capabilities: %{provider: :apple_container, isolation: :container}}} =
-             Workspace.info(workspace)
+             Host.info(workspace)
 
     assert {:ok, snapshot} = AppleContainer.copy_and_save(workspace, "Reviewed report\n")
     assert containers(image) == []
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.close(workspace)
     refute File.exists?(sandbox.root)
 
     memory = open(:memory, snapshot)
 
     assert {:ok, "Reviewed report\n"} =
-             Workspace.read(memory, "reports today/reviewed report.txt")
+             Host.read(memory, "reports today/reviewed report.txt")
 
-    assert :ok = Workspace.close(memory)
+    assert :ok = Host.close(memory)
   end
 
   test "cancel a running container before writing or saving again", %{image: image} do
@@ -78,7 +78,7 @@ defmodule Jido.Workspace.Examples.AppleContainerTest do
 
     run =
       Task.async(fn ->
-        Workspace.run(
+        Host.run(
           workspace,
           ["/bin/sh", "-c", "(sleep 20 && printf late > late.txt) & printf ready; wait"],
           notify_start: {observer, ref}
@@ -89,21 +89,21 @@ defmodule Jido.Workspace.Examples.AppleContainerTest do
 
     await(
       fn ->
-        match?({:ok, %{bytes: "ready", done?: false}}, Workspace.output(workspace, execution_id))
+        match?({:ok, %{bytes: "ready", done?: false}}, Host.output(workspace, execution_id))
       end,
       "start writer",
       5_000
     )
 
     assert [container] = containers(image)
-    assert {:error, %Error{code: :busy}} = Workspace.save(workspace)
+    assert {:error, %Error{code: :busy}} = Host.save(workspace)
 
-    assert :ok = Workspace.cancel(workspace, execution_id)
+    assert :ok = Host.cancel(workspace, execution_id)
     assert {:ok, %Execution{status: :cancelled, exit_status: nil}} = Task.await(run, 12_000)
     assert container not in all_ids()
-    assert :ok = Workspace.write(workspace, "after.txt", "confirmed")
-    assert {:ok, _} = Workspace.save(workspace)
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.write(workspace, "after.txt", "confirmed")
+    assert {:ok, _} = Host.save(workspace)
+    assert :ok = Host.close(workspace)
   end
 
   test "check read-only mounts, loopback, output and time limits, and refused requirements", %{
@@ -111,17 +111,17 @@ defmodule Jido.Workspace.Examples.AppleContainerTest do
     tmp_dir: dir
   } do
     assert {:error, %Error{code: :unsupported_capability, details: %{capability: :stdin}}} =
-             Workspace.open(profile: :apple_pipe)
+             Host.open(profile: :apple_pipe)
 
     assert {:error,
             %Error{code: :unsupported_capability, details: %{capability: :runtime_limits}}} =
-             Workspace.open(profile: :apple_pids)
+             Host.open(profile: :apple_pids)
 
     outside = Path.join(dir, "outside.txt")
     File.write!(outside, "host file")
     writer = open(:apple)
-    assert :ok = Workspace.write(writer, "input.txt", "mounted")
-    assert {:ok, snapshot} = Workspace.save(writer)
+    assert :ok = Host.write(writer, "input.txt", "mounted")
+    assert {:ok, snapshot} = Host.save(writer)
 
     reader = open(:apple_reader, snapshot)
 
@@ -135,23 +135,23 @@ defmodule Jido.Workspace.Examples.AppleContainerTest do
     """
 
     assert {:ok, %Execution{status: :exited, exit_status: 0}} =
-             Workspace.run(reader, ["/bin/sh", "-c", inspection, "check", outside])
+             Host.run(reader, ["/bin/sh", "-c", inspection, "check", outside])
 
     assert {:ok, %Execution{output: "1234", truncated: true, exit_status: 7}} =
-             Workspace.run(writer, ["/bin/sh", "-c", "printf 12345678; exit 7"], output_limit: 4)
+             Host.run(writer, ["/bin/sh", "-c", "printf 12345678; exit 7"], output_limit: 4)
 
     assert {:ok, %Execution{status: :timed_out, exit_status: nil}} =
-             Workspace.run(writer, ["/bin/sleep", "20"], timeout_ms: 750)
+             Host.run(writer, ["/bin/sleep", "20"], timeout_ms: 750)
 
     assert containers(image) == []
-    assert :ok = Workspace.close(reader)
-    assert :ok = Workspace.close(writer)
+    assert :ok = Host.close(reader)
+    assert :ok = Host.close(writer)
   end
 
   defp open(profile, snapshot \\ nil) do
     opts = if snapshot, do: [profile: profile, from: snapshot], else: [profile: profile]
-    assert {:ok, workspace} = Workspace.open(opts)
-    on_exit(fn -> Workspace.close(workspace) end)
+    assert {:ok, workspace} = Host.open(opts)
+    on_exit(fn -> Host.close(workspace) end)
     workspace
   end
 

@@ -1,15 +1,15 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.DisposableSandboxTest do
+defmodule Jido.Realm.Host.Examples.DisposableSandboxTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution, Sandbox}
-  alias Jido.Workspace.Examples.DisposableSandbox
-  import Jido.Workspace.Examples.LifecycleSupport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution, Sandbox}
+  alias Jido.Realm.Host.Examples.DisposableSandbox
+  import Jido.Realm.Host.Examples.LifecycleSupport
 
   @report "Checked report\n"
 
@@ -35,55 +35,69 @@ defmodule Jido.Workspace.Examples.DisposableSandboxTest do
   test "a missing native executable returns a start failure and the tree stays available", %{
     missing: missing
   } do
-    assert {:ok, workspace} = Workspace.open(profile: :local)
+    assert {:ok, workspace} = Host.open(profile: :local)
 
     try do
       assert {:error, %Error{operation: :run, code: :policy_denied}} =
-               Workspace.run(workspace, ["/bin/sh"])
+               Host.run(workspace, ["/bin/sh"])
 
       assert {:error, %Error{operation: :run, code: :start_failed}} =
-               Workspace.run(workspace, [missing])
+               Host.run(workspace, [missing])
 
-      assert {:error, %Error{operation: :run, code: :unsupported_capability}} =
-               Workspace.run(workspace, ["/bin/sleep", "1"], stdin: :pipe)
+      assert {:ok, %{capabilities: %{stdin: :pipe}}} = Host.info(workspace)
+
+      assert {:ok, %Execution{status: :exited, exit_status: 0}} =
+               Host.run(workspace, ["/bin/sleep", "0"], stdin: :pipe)
 
       assert {:ok, %Execution{status: :exited, exit_status: 0, output: ""}} =
-               Workspace.run(workspace, ["/bin/cat"], stdin: :closed, timeout_ms: 1_000)
+               Host.run(workspace, ["/bin/cat"], stdin: :closed, timeout_ms: 1_000)
 
-      assert {:ok, %{phase: :ready}} = Workspace.info(workspace)
+      assert {:ok, %{phase: :ready}} = Host.info(workspace)
       assert {:ok, _} = DisposableSandbox.copy_report(workspace, @report)
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 
   test "Local admission refuses an unsafe profile and unmet isolation" do
-    profile = Application.fetch_env!(:jido_workspace, :profiles).local
+    profile = Application.fetch_env!(:jido_realm, :profiles).local
 
     for changes <- [
           %{policy: [:read, :execute]},
           %{tools: []},
           %{tools: ["cp"]},
-          %{checkout: System.tmp_dir!()},
+          %{checkout: "relative/checkout"},
           %{image: "alpine:3.20"}
         ] do
       put_profile(:invalid, Map.merge(profile, changes))
-      assert {:error, %Error{code: :invalid_profile}} = Workspace.open(profile: :invalid)
+      assert {:error, %Error{code: :invalid_profile}} = Host.open(profile: :invalid)
     end
 
     put_profile(:isolated, %{profile | require: %{isolation: :container}})
 
     assert {:error, %Error{code: :unsupported_capability, details: %{capability: :isolation}}} =
-             Workspace.open(profile: :isolated)
+             Host.open(profile: :isolated)
 
     put_profile(:offline, %{profile | require: %{network: :disabled}})
 
     assert {:error, %Error{code: :unsupported_capability, details: %{capability: :network}}} =
-             Workspace.open(profile: :offline)
+             Host.open(profile: :offline)
+  end
+
+  test "closing a Local workspace preserves a host-owned checkout", %{tmp_dir: root} do
+    checkout = Path.join(root, "checkout")
+    File.mkdir!(checkout)
+    profile = Application.fetch_env!(:jido_realm, :profiles).local
+    put_profile(:checkout, Map.put(profile, :checkout, checkout))
+
+    assert {:ok, workspace} = Host.open(profile: :checkout)
+    assert :ok = Host.write(workspace, "kept.txt", @report)
+    assert :ok = Host.close(workspace)
+    assert File.read!(Path.join(checkout, "kept.txt")) == @report
   end
 
   test "a timeout waits for the direct Local process to exit" do
-    assert {:ok, workspace} = Workspace.open(profile: :local)
+    assert {:ok, workspace} = Host.open(profile: :local)
     {_controller, sandbox} = provider(workspace, :native)
 
     try do
@@ -91,13 +105,13 @@ defmodule Jido.Workspace.Examples.DisposableSandboxTest do
 
       task =
         Task.async(fn ->
-          Workspace.run(workspace, ["/bin/sleep", "30"], timeout_ms: 2_000)
+          Host.run(workspace, ["/bin/sleep", "30"], timeout_ms: 2_000)
         end)
 
       %{os_pid: pid} = running_process(sandbox)
 
       assert {"", 0} = probe_pid(pid)
-      assert {:error, %Error{code: :busy}} = Workspace.save(workspace)
+      assert {:error, %Error{code: :busy}} = Host.save(workspace)
 
       assert {:ok, %Execution{status: :timed_out, exit_status: nil}} =
                Task.await(task, 5_000)
@@ -106,16 +120,16 @@ defmodule Jido.Workspace.Examples.DisposableSandboxTest do
       assert status != 0
       assert {:ok, _} = DisposableSandbox.copy_report(workspace, @report)
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
 
     refute File.exists?(sandbox.root)
   end
 
   test "losing the Local command port leaves a live process and fences the tree" do
-    assert {:ok, workspace} = Workspace.open(profile: :local)
+    assert {:ok, workspace} = Host.open(profile: :local)
     {_controller, sandbox} = provider(workspace, :native)
-    task = Task.async(fn -> Workspace.run(workspace, ["/bin/sleep", "30"]) end)
+    task = Task.async(fn -> Host.run(workspace, ["/bin/sleep", "30"]) end)
     %{handle: port, os_pid: pid} = running_process(sandbox)
 
     try do
@@ -124,12 +138,12 @@ defmodule Jido.Workspace.Examples.DisposableSandboxTest do
 
       assert {:error, %Error{code: :quiescence_unknown}} = Task.await(task)
       assert {"", 0} = probe_pid(pid)
-      assert {:error, %Error{code: :quiescence_unknown}} = Workspace.save(workspace)
+      assert {:error, %Error{code: :quiescence_unknown}} = Host.save(workspace)
 
       assert {:error, %Error{code: :quiescence_unknown}} =
-               Workspace.write(workspace, "late.txt", "Blocked")
+               Host.write(workspace, "late.txt", "Blocked")
 
-      assert {:error, %Error{code: :cleanup_unconfirmed}} = Workspace.close(workspace)
+      assert {:error, %Error{code: :cleanup_unconfirmed}} = Host.close(workspace)
       assert File.dir?(sandbox.root)
     after
       System.cmd("/bin/kill", ["-KILL", Integer.to_string(pid)], stderr_to_stdout: true)
@@ -153,7 +167,7 @@ defmodule Jido.Workspace.Examples.DisposableSandboxTest do
   end
 
   defp exercise_disposable(profile, isolation) do
-    assert {:ok, workspace} = Workspace.open(profile: profile)
+    assert {:ok, workspace} = Host.open(profile: profile)
     {_controller, sandbox} = provider(workspace, :native)
     closed = Process.monitor(sandbox.pid)
     if profile == :docker, do: clean_up_docker_on_failure(sandbox)
@@ -161,30 +175,30 @@ defmodule Jido.Workspace.Examples.DisposableSandboxTest do
     snapshot =
       try do
         assert {:ok, %{capabilities: %{provider: ^profile, isolation: ^isolation}}} =
-                 Workspace.info(workspace)
+                 Host.info(workspace)
 
         assert {:ok, snapshot} = DisposableSandbox.copy_report(workspace, @report)
-        assert :ok = Workspace.write(workspace, "report.txt", "Unsaved change")
+        assert :ok = Host.write(workspace, "report.txt", "Unsaved change")
         assert File.dir?(sandbox.root)
         if profile == :docker, do: assert([_] = containers(sandbox))
         snapshot
       after
-        assert :ok = Workspace.close(workspace)
+        assert :ok = Host.close(workspace)
       end
 
     assert_receive {:DOWN, ^closed, :process, _, :normal}
     refute File.exists?(sandbox.root)
     assert {:error, :not_found} = Sandbox.attach(sandbox.id)
-    assert {:error, %Error{code: :closed}} = Workspace.read(workspace, "report.txt")
-    assert :ok = Workspace.close(workspace)
+    assert {:error, %Error{code: :closed}} = Host.read(workspace, "report.txt")
+    assert :ok = Host.close(workspace)
     if profile == :docker, do: assert([] = containers(sandbox))
 
-    assert {:ok, restored} = Workspace.open(profile: :memory, from: snapshot)
+    assert {:ok, restored} = Host.open(profile: :memory, from: snapshot)
 
     try do
-      assert {:ok, @report} = Workspace.read(restored, "report.txt")
+      assert {:ok, @report} = Host.read(restored, "report.txt")
     after
-      assert :ok = Workspace.close(restored)
+      assert :ok = Host.close(restored)
     end
   end
 
@@ -206,7 +220,7 @@ defmodule Jido.Workspace.Examples.DisposableSandboxTest do
   end
 
   defp put_profile(name, profile) do
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
-    Application.put_env(:jido_workspace, :profiles, Map.put(profiles, name, profile))
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
+    Application.put_env(:jido_realm, :profiles, Map.put(profiles, name, profile))
   end
 end

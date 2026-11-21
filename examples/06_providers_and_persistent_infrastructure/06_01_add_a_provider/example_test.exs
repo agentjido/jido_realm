@@ -1,15 +1,15 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 Code.require_file("report_provider.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.CustomProviderTest do
+defmodule Jido.Realm.Host.Examples.CustomProviderTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Entry, Error, Execution}
-  alias Jido.Workspace.Examples.ReportProvider
-  import Jido.Workspace.Examples.LifecycleSupport, only: [await: 3, configure: 1]
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Entry, Error, Execution}
+  alias Jido.Realm.Host.Examples.ReportProvider
+  import Jido.Realm.Host.Examples.LifecycleSupport, only: [await: 3, configure: 1]
 
   @wait 4_000
   @secret "internal fixture credential"
@@ -28,10 +28,10 @@ defmodule Jido.Workspace.Examples.CustomProviderTest do
       store: "reports"
     }
 
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
 
     Application.put_env(
-      :jido_workspace,
+      :jido_realm,
       :profiles,
       Map.merge(profiles, %{
         report: profile,
@@ -63,7 +63,7 @@ defmodule Jido.Workspace.Examples.CustomProviderTest do
 
   test "the public API uses the provider tree for files, literal argv, and snapshots",
        %{registry: registry} do
-    assert {:ok, workspace} = Workspace.open(profile: :report)
+    assert {:ok, workspace} = Host.open(profile: :report)
     assert_receive {:provisioned, %{id: lease_id, controller: controller}}, @wait
     refute inspect(:sys.get_status(controller)) =~ @secret
 
@@ -78,71 +78,71 @@ defmodule Jido.Workspace.Examples.CustomProviderTest do
                     cancellation: :cooperative,
                     tree_access: :read_write
                   }
-                }} = Workspace.info(workspace)
+                }} = Host.info(workspace)
 
-        assert :ok = Workspace.mkdir(workspace, "build")
+        assert :ok = Host.mkdir(workspace, "build")
 
         assert :ok =
-                 Workspace.write_stream(workspace, "build/draft; Q4", ["quarterly ", "report\n"])
+                 Host.write_stream(workspace, "build/draft; Q4", ["quarterly ", "report\n"])
 
-        assert {:ok, "quarterly"} = Workspace.read_chunk(workspace, "build/draft; Q4", 0, 9)
+        assert {:ok, "quarterly"} = Host.read_chunk(workspace, "build/draft; Q4", 0, 9)
 
         assert {:ok, %Execution{exit_status: 0, output: "cop", truncated: true}} =
-                 Workspace.run(workspace, ["copy", "draft; Q4", "report.txt"],
+                 Host.run(workspace, ["copy", "draft; Q4", "report.txt"],
                    cwd: "build",
                    output_limit: 3
                  )
 
         assert {:ok, @report, revision} =
-                 Workspace.read(workspace, "build/report.txt", revision: true)
+                 Host.read(workspace, "build/report.txt", revision: true)
 
         assert :ok =
-                 Workspace.write(workspace, "build/report.txt", "reviewed\n", expected: revision)
+                 Host.write(workspace, "build/report.txt", "reviewed\n", expected: revision)
 
         assert {:error, %Error{code: :stale_revision}} =
-                 Workspace.write(workspace, "build/report.txt", "stale edit", expected: revision)
+                 Host.write(workspace, "build/report.txt", "stale edit", expected: revision)
 
         assert {:ok, [%Entry{path: "build/report.txt"}]} =
-                 Workspace.find(workspace, "build", contains: "reviewed")
+                 Host.find(workspace, "build", contains: "reviewed")
 
         assert {:ok, %Execution{exit_status: 1}} =
-                 Workspace.run(workspace, ["copy", "../outside", "bad"], cwd: "build")
+                 Host.run(workspace, ["copy", "../outside", "bad"], cwd: "build")
 
-        assert {:error, %Error{code: :policy_denied}} = Workspace.run(workspace, ["anything"])
-        assert {:ok, snapshot} = Workspace.save(workspace)
+        assert {:error, %Error{code: :policy_denied}} = Host.run(workspace, ["anything"])
+        assert {:ok, snapshot} = Host.save(workspace)
         snapshot
       after
-        assert :ok = Workspace.close(workspace)
+        assert :ok = Host.close(workspace)
       end
 
     assert_receive {:release_result, ^lease_id, :ok}, @wait
     assert ReportProvider.active_leases(registry) == []
 
-    assert {:ok, reopened} = Workspace.open(profile: :read_only, from: snapshot)
+    assert {:ok, reopened} = Host.open(profile: :read_only, from: snapshot)
     assert_receive {:provisioned, %{id: new_lease_id}}, @wait
     assert new_lease_id != lease_id
 
     try do
-      assert {:ok, "reviewed\n"} = Workspace.read(reopened, "build/report.txt")
-      assert {:ok, %{capabilities: %{tree_access: :read_only}}} = Workspace.info(reopened)
+      assert {:ok, "reviewed\n"} = Host.read(reopened, "build/report.txt")
+      assert {:ok, %{capabilities: %{tree_access: :read_only}}} = Host.info(reopened)
 
       assert {:ok, %Execution{exit_status: 1}} =
-               Workspace.run(reopened, ["copy", "report.txt", "intrusion"], cwd: "build")
+               Host.run(reopened, ["copy", "report.txt", "intrusion"], cwd: "build")
 
       assert {:error, %Error{code: :policy_denied}} =
-               Workspace.write(reopened, "build/report.txt", "intrusion")
+               Host.write(reopened, "build/report.txt", "intrusion")
 
-      assert {:ok, "reviewed\n"} = Workspace.read(reopened, "build/report.txt")
+      assert {:ok, "reviewed\n"} = Host.read(reopened, "build/report.txt")
     after
-      assert :ok = Workspace.close(reopened)
+      assert :ok = Host.close(reopened)
     end
 
-    assert {:ok, memory} = Workspace.open(profile: :memory, from: snapshot)
+    assert {:ok, memory} = Host.open(profile: :memory, from: snapshot)
 
     try do
-      assert {:ok, "reviewed\n"} = Workspace.read(memory, "build/report.txt")
+      assert {:ok, "reviewed\n"} = Host.read(memory, "build/report.txt")
     after
-      assert :ok = Workspace.close(memory)
+      assert :ok = Host.close(memory)
     end
   end
 
@@ -150,19 +150,19 @@ defmodule Jido.Workspace.Examples.CustomProviderTest do
        %{registry: registry} do
     for {profile, capability} <- [stronger: :isolation, wrong_access: :tree_access] do
       assert {:error, %Error{code: :unsupported_capability, details: %{capability: ^capability}}} =
-               Workspace.open(profile: profile)
+               Host.open(profile: profile)
 
       assert_receive {:provisioned, %{id: id}}, @wait
       assert_receive {:release_result, ^id, :ok}, @wait
       assert ReportProvider.active_leases(registry) == []
     end
 
-    assert {:error, %Error{code: :invalid_profile}} = Workspace.open(profile: :invalid)
+    assert {:error, %Error{code: :invalid_profile}} = Host.open(profile: :invalid)
   end
 
   test "a callback crash after allocation releases by lease ID and hides its cause",
        %{registry: registry} do
-    assert {:error, %Error{code: :provider_failed} = error} = Workspace.open(profile: :broken)
+    assert {:error, %Error{code: :provider_failed} = error} = Host.open(profile: :broken)
     refute inspect(error) =~ @secret
     assert_receive {:provisioned, %{id: id}}, @wait
     assert_receive {:release_result, ^id, :ok}, @wait
@@ -171,7 +171,7 @@ defmodule Jido.Workspace.Examples.CustomProviderTest do
 
   test "release can revoke the lease before a delayed provision returns",
        %{registry: registry} do
-    opener = Task.async(fn -> Workspace.open(profile: :slow, timeout_ms: 500) end)
+    opener = Task.async(fn -> Host.open(profile: :slow, timeout_ms: 500) end)
     assert_receive {:provision_waiting, %{id: id, controller: controller}}, @wait
 
     assert {:error, %Error{code: :open_timeout}} = Task.await(opener, @wait)
@@ -186,7 +186,7 @@ defmodule Jido.Workspace.Examples.CustomProviderTest do
 
     {opener, monitor} =
       spawn_monitor(fn ->
-        Workspace.open(profile: :slow, owner: owner, timeout_ms: 10_000)
+        Host.open(profile: :slow, owner: owner, timeout_ms: 10_000)
       end)
 
     assert_receive {:provision_waiting, %{id: id, controller: controller}}, @wait
@@ -199,41 +199,41 @@ defmodule Jido.Workspace.Examples.CustomProviderTest do
   end
 
   test "the cleanup owner releases after the workspace controller dies", %{registry: registry} do
-    assert {:ok, workspace} = Workspace.open(profile: :report)
+    assert {:ok, workspace} = Host.open(profile: :report)
     assert_receive {:provisioned, %{id: id, controller: controller}}, @wait
     monitor = Process.monitor(controller)
     Process.exit(controller, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^controller, :killed}, @wait
     assert_receive {:release_result, ^id, :ok}, @wait
     assert ReportProvider.active_leases(registry) == []
-    assert {:error, %Error{code: :closed}} = Workspace.read(workspace, "report.txt")
-    assert await(fn -> Workspace.close(workspace) == :ok end, "Release was not confirmed", @wait)
+    assert {:error, %Error{code: :closed}} = Host.read(workspace, "report.txt")
+    assert await(fn -> Host.close(workspace) == :ok end, "Release was not confirmed", @wait)
   end
 
   test "a release failure stays explicit until the provider confirms a retry",
        %{registry: registry} do
-    assert {:ok, workspace} = Workspace.open(profile: :delayed_release)
+    assert {:ok, workspace} = Host.open(profile: :delayed_release)
     assert_receive {:provisioned, %{id: id}}, @wait
-    assert {:error, %Error{code: :cleanup_unconfirmed}} = Workspace.close(workspace)
+    assert {:error, %Error{code: :cleanup_unconfirmed}} = Host.close(workspace)
     assert_receive {:release_result, ^id, {:error, :cleanup_unconfirmed}}, @wait
-    assert {:error, %Error{code: :closed}} = Workspace.write(workspace, "late", "denied")
-    assert :ok = Workspace.close(workspace)
+    assert {:error, %Error{code: :closed}} = Host.write(workspace, "late", "denied")
+    assert :ok = Host.close(workspace)
     assert_receive {:release_result, ^id, :ok}, @wait
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.close(workspace)
     assert ReportProvider.active_leases(registry) == []
   end
 
   test "run streams output, confirms cancellation, and fences an unknown command result" do
-    assert {:ok, workspace} = Workspace.open(profile: :report)
+    assert {:ok, workspace} = Host.open(profile: :report)
 
     try do
-      run = Task.async(fn -> Workspace.run(workspace, ["wait"], timeout_ms: 10_000) end)
+      run = Task.async(fn -> Host.run(workspace, ["wait"], timeout_ms: 10_000) end)
 
       id =
         await(
           fn ->
-            with {:ok, %{active_execution_id: id}} when is_binary(id) <- Workspace.info(workspace),
-                 {:ok, %{bytes: "waiting\n"}} <- Workspace.output(workspace, id) do
+            with {:ok, %{active_execution_id: id}} when is_binary(id) <- Host.info(workspace),
+                 {:ok, %{bytes: "waiting\n"}} <- Host.output(workspace, id) do
               id
             else
               _ -> nil
@@ -243,26 +243,26 @@ defmodule Jido.Workspace.Examples.CustomProviderTest do
           @wait
         )
 
-      assert {:error, %Error{code: :busy}} = Workspace.save(workspace)
-      assert :ok = Workspace.cancel(workspace, id)
+      assert {:error, %Error{code: :busy}} = Host.save(workspace)
+      assert :ok = Host.cancel(workspace, id)
 
       assert {:ok, %Execution{id: ^id, status: :cancelled, exit_status: nil}} =
                Task.await(run, @wait)
 
-      assert :ok = Workspace.write(workspace, "report.txt", @report)
-      assert {:ok, _} = Workspace.save(workspace)
+      assert :ok = Host.write(workspace, "report.txt", @report)
+      assert {:ok, _} = Host.save(workspace)
 
       assert {:error, %Error{code: :quiescence_unknown}} =
-               Workspace.run(workspace, ["missing-result"])
+               Host.run(workspace, ["missing-result"])
 
-      assert {:ok, %{phase: :quiescence_unknown}} = Workspace.info(workspace)
+      assert {:ok, %{phase: :quiescence_unknown}} = Host.info(workspace)
 
       assert {:error, %Error{code: :quiescence_unknown}} =
-               Workspace.write(workspace, "late", "denied")
+               Host.write(workspace, "late", "denied")
 
-      assert {:error, %Error{code: :quiescence_unknown}} = Workspace.save(workspace)
+      assert {:error, %Error{code: :quiescence_unknown}} = Host.save(workspace)
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 end

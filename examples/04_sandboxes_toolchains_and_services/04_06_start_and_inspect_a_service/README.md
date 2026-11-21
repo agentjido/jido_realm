@@ -13,7 +13,7 @@ The host selects the connector and the TCP ports before opening the
 workspace.
 
 ```elixir
-config :jido_workspace,
+config :jido_realm,
   profiles: %{
     report_service: %{
       provider: :docker,
@@ -32,45 +32,45 @@ The connector is a trusted executable from the image. It takes an IPv4
 address and a port number as arguments and transfers bytes between TCP
 and its standard streams. Docker runs it inside the service container.
 The container keeps the `none` network driver and has no published host
-ports. Workspace supplies the loopback address and checks the port
+ports. Realm supplies the loopback address and checks the port
 against the profile. [Docker none network driver](https://docs.docker.com/engine/network/drivers/none)
 
 ## Start, connect, and stop
 
 Copy [service.sh](service.sh) to `site/service.sh` with
-`Workspace.write/3`. Write a one-line report to `site/report.txt`.
+`Host.write/3`. Write a one-line report to `site/report.txt`.
 Run the script from that directory. This run waits for the service to
 stop, so put it in a task.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
-{:ok, workspace} = Workspace.open(profile: :report_service)
-:ok = Workspace.mkdir(workspace, "site")
+{:ok, workspace} = Host.open(profile: :report_service)
+:ok = Host.mkdir(workspace, "site")
 
 script =
   File.read!(
     "examples/04_sandboxes_toolchains_and_services/04_06_start_and_inspect_a_service/service.sh"
   )
 
-:ok = Workspace.write(workspace, "site/service.sh", script)
-:ok = Workspace.write(workspace, "site/report.txt", "reviewed report\n")
+:ok = Host.write(workspace, "site/service.sh", script)
+:ok = Host.write(workspace, "site/report.txt", "reviewed report\n")
 
 service =
   Task.async(fn ->
-    Workspace.run(workspace, ["/bin/sh", "service.sh", "8080"],
+    Host.run(workspace, ["/bin/sh", "service.sh", "8080"],
       cwd: "site",
       timeout_ms: 60_000
     )
   end)
 ```
 
-Read `Workspace.info(workspace)` until it reports an active execution ID.
+Read `Host.info(workspace)` until it reports an active execution ID.
 The same reply lists `:service_ports` under `:capabilities`. Use this ID
 for connection, cancellation, and command output.
 
 ```elixir
-{:ok, connection} = Workspace.connect(workspace, id, 8080)
+{:ok, connection} = Host.connect(workspace, id, 8080)
 ```
 
 An open Erlang port means that the host started the connector. Wait
@@ -84,21 +84,21 @@ output limit applies to the run's output, and the connection carries
 its own byte stream.
 
 Send `"quit\n"`, read `"bye\n"`, then close the Erlang port. A second
-`Workspace.connect/3` call opens a new TCP connection under the same
+`Host.connect/3` call opens a new TCP connection under the same
 execution ID. Closing a client port lets the service keep running.
-`Workspace.cancel/2` or `Workspace.close/1` requests a stop for the
+`Host.cancel/2` or `Host.close/1` requests a stop for the
 service command and its connections.
 
 ```elixir
-:ok = Workspace.cancel(workspace, id)
+:ok = Host.cancel(workspace, id)
 {:ok, %{status: :cancelled}} = Task.await(service, 5_000)
-{:ok, snapshot} = Workspace.save(workspace)
-:ok = Workspace.close(workspace)
+{:ok, snapshot} = Host.save(workspace)
+:ok = Host.close(workspace)
 ```
 
 Writes and saves return `:busy` while the service runs. If Docker
 cannot confirm that the service stopped,
-the run reports `:quiescence_unknown` and Workspace keeps the tree
+the run reports `:quiescence_unknown` and Realm keeps the tree
 blocked for writes and saves. Close the workspace to confirm cleanup.
 A snapshot keeps the report files. Open a workspace from that reference
 to read them after the service and its connections end.

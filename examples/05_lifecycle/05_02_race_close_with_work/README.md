@@ -1,15 +1,15 @@
 # 05.02 Close while work is running
 
-Use `Workspace.close/2` to bound how long the caller waits. Once the
+Use `Host.close/2` to bound how long the caller waits. Once the
 controller accepts close, it refuses new writes, commands, and saves. An
 accepted command or save can finish before the provider releases the tree.
 Keep the last snapshot reference for recovery. [Example](example.ex)
 
 ```elixir
-alias Jido.Workspace
-alias Jido.Workspace.Error
+alias Jido.Realm.Host
+alias Jido.Realm.Host.Error
 
-case Workspace.close(workspace, timeout_ms: 100) do
+case Host.close(workspace, timeout_ms: 100) do
   :ok ->
     {:closed, last_saved_snapshot}
 

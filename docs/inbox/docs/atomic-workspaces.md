@@ -6,7 +6,7 @@ This change coordinates three package boundaries:
 | --- | --- | --- |
 | Jido VFS | Immutable captures and checked atomic memory edits | [agentjido/jido_vfs#46](https://github.com/agentjido/jido_vfs/pull/46) |
 | Jido Shell | Sessions borrow caller-owned filesystems; local commands stop before cleanup | [agentjido/jido_shell#73](https://github.com/agentjido/jido_shell/pull/73) |
-| Jido Workspace | Own storage and session lifetime; compose the two APIs | This change |
+| Jido Realm | Own storage and session lifetime; compose the two APIs | This change |
 
 `mix.exs` and `mix.lock` select the commits from both dependency PRs. No local path
 dependencies are required. Review the VFS and Shell contracts first, then this

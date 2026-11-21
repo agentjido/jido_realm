@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jido Realm Workbench</title>
+  <link rel="stylesheet" href="/workbench.css">
+  <script src="/workbench.js" defer></script>
+</head>
+<body>
+  <header class="bar">
+    <div class="wrap brand"><span class="mark" aria-hidden="true">R</span> Jido Realm <span class="sep" aria-hidden="true">/</span> Workbench</div>
+  </header>
+  <main class="wrap">
+    <section class="intro">
+      <div>
+        <h1>Coding agent workbench</h1>
+        <p>Build a project in a Realm and open its live preview.</p>
+      </div>
+      <button id="all" class="primary">Run all eight builds</button>
+    </section>
+    <p id="status" role="status" aria-live="polite"></p>
+    <section class="cases" aria-labelledby="matrix-heading">
+      <div class="section-title">
+        <h2 id="matrix-heading">Build matrix</h2>
+        <span id="model"></span>
+      </div>
+      <table>
+        <thead><tr><th scope="col">Provider</th><th scope="col">Phoenix Mix app</th><th scope="col">TypeScript landing page</th></tr></thead>
+        <tbody id="matrix"></tbody>
+      </table>
+    </section>
+    <section class="details" aria-labelledby="detail-heading">
+      <div class="section-title"><h2 id="detail-heading">Build details</h2><a id="preview" target="_blank" rel="noopener" hidden>Open live preview ↗</a></div>
+      <p id="empty">Select a build to inspect its logs and source files.</p>
+      <div id="result" hidden>
+        <p id="run-summary"></p>
+        <label for="file">View</label>
+        <select id="file"><option value="">Build log</option></select>
+        <pre id="output" tabindex="0"></pre>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

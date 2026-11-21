@@ -1,10 +1,10 @@
-# Jido.Workspace Usage Rules
+# Jido.Realm.Host Usage Rules
 
 ## For LLM Tool Builders
 
 ## Scope Boundary
 
-- `jido_workspace` owns workspace state + artifact/session convenience only.
+- `jido_realm` owns workspace state + artifact/session convenience only.
 - Do not add provider orchestration, harness runtime policy, or sprite workflow orchestration here.
 - Keep this package reusable as a shell+VFS workspace library.
 

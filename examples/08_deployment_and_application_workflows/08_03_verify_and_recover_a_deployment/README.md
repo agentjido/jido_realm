@@ -12,15 +12,15 @@ iex -S mix
 ```
 
 ```elixir
-alias Jido.Workspace
-alias Jido.Workspace.{Deploy, Sandbox}
-alias Jido.Workspace.Deploy.{Artifact, Recipe, Snapshot}
+alias Jido.Realm.Host
+alias Jido.Realm.Host.{Deploy, Sandbox}
+alias Jido.Realm.Host.Deploy.{Artifact, Recipe, Snapshot}
 
-Application.put_env(:jido_workspace, :stores, %{
+Application.put_env(:jido_realm, :stores, %{
   "reports" => System.fetch_env!("WORKSPACE_RESULTS_DIR")
 })
 
-Application.put_env(:jido_workspace, :profiles, %{
+Application.put_env(:jido_realm, :profiles, %{
   author: %{provider: :memory, policy: :workspace_write, store: "reports"},
   reader: %{provider: :memory, policy: :read_only, store: "reports"}
 })
@@ -34,13 +34,13 @@ else
 fi
 """
 
-{:ok, workspace} = Workspace.open(profile: :author)
-:ok = Workspace.write(workspace, "verify.sh", verify)
-:ok = Workspace.write(workspace, "report.txt", "approved\n")
-{:ok, approved} = Workspace.save(workspace)
-:ok = Workspace.write(workspace, "report.txt", "rejected\n")
-{:ok, candidate} = Workspace.save(workspace)
-:ok = Workspace.close(workspace)
+{:ok, workspace} = Host.open(profile: :author)
+:ok = Host.write(workspace, "verify.sh", verify)
+:ok = Host.write(workspace, "report.txt", "approved\n")
+{:ok, approved} = Host.save(workspace)
+:ok = Host.write(workspace, "report.txt", "rejected\n")
+{:ok, candidate} = Host.save(workspace)
+:ok = Host.close(workspace)
 
 artifact = fn reference, version ->
   {:ok, payload} = Snapshot.from_saved(reference, profile: :reader)

@@ -17,10 +17,10 @@ iex -S mix
 
 ```elixir
 root = System.fetch_env!("WORKSPACE_RESULTS_DIR")
-Application.put_env(:jido_workspace, :stores, %{"reports" => root})
+Application.put_env(:jido_realm, :stores, %{"reports" => root})
 policy = [:read, :write, :execute, :save]
 
-Application.put_env(:jido_workspace, :profiles, %{
+Application.put_env(:jido_realm, :profiles, %{
   lua_build: %{provider: :memory, policy: policy, tools: ["lua"], store: "reports"},
   docker_build: %{
     provider: :docker,
@@ -45,11 +45,11 @@ Run this code from the repository root. To repeat it on Docker, use
 The host keeps the build handle private while the helper runs and saves.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
 fixture = "examples/08_deployment_and_application_workflows/08_01_build_test_review_and_hand_off"
 Code.require_file(Path.join(fixture, "example.ex"))
-alias Jido.Workspace.Examples.BuildAndReview
+alias Jido.Realm.Host.Examples.BuildAndReview
 
 {profile, tool, script} = {:lua_build, "lua", "report.lua"}
 opts = [cwd: "app", output_limit: 4_096]
@@ -64,23 +64,23 @@ on_output = fn stage, _id, slice ->
   IO.binwrite(slice.bytes)
 end
 
-{:ok, workspace} = Workspace.open(profile: profile)
+{:ok, workspace} = Host.open(profile: profile)
 
 snapshot =
   try do
-    :ok = Workspace.mkdir(workspace, "app")
-    :ok = Workspace.write(workspace, "app/" <> script, File.read!(Path.join(fixture, script)))
-    :ok = Workspace.write(workspace, "app/draft; Q4.txt", "quarterly report\n")
-    :ok = Workspace.write(workspace, "app/expected.txt", "REPORT\nQUARTERLY REPORT\n")
+    :ok = Host.mkdir(workspace, "app")
+    :ok = Host.write(workspace, "app/" <> script, File.read!(Path.join(fixture, script)))
+    :ok = Host.write(workspace, "app/draft; Q4.txt", "quarterly report\n")
+    :ok = Host.write(workspace, "app/expected.txt", "REPORT\nQUARTERLY REPORT\n")
     {:ok, snapshot} = BuildAndReview.run(workspace, build, test, on_output)
     snapshot
   after
-    :ok = Workspace.close(workspace)
+    :ok = Host.close(workspace)
   end
 ```
 
 Each stage sets `notify_start: {reader_pid, reference}` on
-`Workspace.run/3`. The reader uses the execution ID in the start message
+`Host.run/3`. The reader uses the execution ID in the start message
 to read the output by byte offset. It finishes reading each stage before
 the next command replaces the output record. It uses the run result to
 check the exit status. An admission error can return before a start
@@ -101,13 +101,13 @@ This task opens its own read-only handle to the checked tree.
 reference = Jason.encode!(snapshot)
 
 review = Task.async(fn ->
-  {:ok, workspace} = Workspace.open(profile: :reviewer, from: Jason.decode!(reference))
+  {:ok, workspace} = Host.open(profile: :reviewer, from: Jason.decode!(reference))
 
   try do
-    {:ok, report} = Workspace.read(workspace, "app/report.txt")
+    {:ok, report} = Host.read(workspace, "app/report.txt")
     report
   after
-    :ok = Workspace.close(workspace)
+    :ok = Host.close(workspace)
   end
 end)
 

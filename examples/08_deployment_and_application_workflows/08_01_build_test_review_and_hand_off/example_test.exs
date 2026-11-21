@@ -1,14 +1,14 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.BuildAndReviewTest do
+defmodule Jido.Realm.Host.Examples.BuildAndReviewTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution}
-  alias Jido.Workspace.Examples.{BuildAndReview, LifecycleSupport}
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution}
+  alias Jido.Realm.Host.Examples.{BuildAndReview, LifecycleSupport}
 
   @draft "app/draft; Q4.txt"
   @expected "app/expected.txt"
@@ -18,11 +18,11 @@ defmodule Jido.Workspace.Examples.BuildAndReviewTest do
   setup %{tmp_dir: root} do
     store = Path.join(root, "snapshots")
     LifecycleSupport.configure(store)
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
     policy = [:read, :write, :execute, :save]
 
     Application.put_env(
-      :jido_workspace,
+      :jido_realm,
       :profiles,
       Map.merge(profiles, %{
         lua_build: Map.merge(profiles.memory, %{policy: policy, tools: ["lua"]}),
@@ -64,12 +64,12 @@ defmodule Jido.Workspace.Examples.BuildAndReviewTest do
     assert stage_output(:build) == "building report\n"
     id = wait_for_test_output("testing report\n")
     assert File.ls(store) in [{:error, :enoent}, {:ok, []}]
-    assert {:error, %Error{code: :busy}} = Workspace.save(workspace)
-    assert :ok = Workspace.input(workspace, id, "continue\n")
+    assert {:error, %Error{code: :busy}} = Host.save(workspace)
+    assert :ok = Host.input(workspace, id, "continue\n")
 
     assert {:ok, snapshot} = Task.await(task, 10_000)
     assert stage_output(:test) == "passed\n"
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.close(workspace)
     verify_handoff(snapshot, @report)
   end
 
@@ -85,26 +85,24 @@ defmodule Jido.Workspace.Examples.BuildAndReviewTest do
              BuildAndReview.run(workspace, denied, test, forward_to(self()))
 
     assert {:error, %Error{code: :policy_denied}} =
-             Workspace.run(workspace, ["sh", "report.lua"], notify_start: {self(), tag})
+             Host.run(workspace, ["sh", "report.lua"], notify_start: {self(), tag})
 
     refute_received {:workspace_command_started, ^tag, _}
     refute_received {:progress, _, _, _}
     assert File.ls(store) in [{:error, :enoent}, {:ok, []}]
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.close(workspace)
   end
 
   test "batch steps send distinct start notices, including commands that have already exited" do
-    assert {:ok, workspace} = Workspace.open(profile: :memory)
+    assert {:ok, workspace} = Host.open(profile: :memory)
     first = make_ref()
     second = make_ref()
 
     assert {:error, %Error{code: :invalid_input}} =
-             Workspace.run(workspace, ["echo", "invalid"],
-               notify_start: {self(), "not a reference"}
-             )
+             Host.run(workspace, ["echo", "invalid"], notify_start: {self(), "not a reference"})
 
     assert {:ok, %{status: :completed, results: [%Execution{id: one}, %Execution{id: two}]}} =
-             Workspace.batch(workspace, [
+             Host.batch(workspace, [
                {:run, ["echo", "first"], [notify_start: {self(), first}]},
                {:run, ["echo", "second"], [notify_start: {self(), second}]}
              ])
@@ -112,9 +110,9 @@ defmodule Jido.Workspace.Examples.BuildAndReviewTest do
     assert_receive {:workspace_command_started, ^first, ^one}
     assert_receive {:workspace_command_started, ^second, ^two}
     assert one != two
-    assert {:error, %Error{code: :output_unavailable}} = Workspace.output(workspace, one)
-    assert {:ok, %{bytes: "second\n", done?: true}} = Workspace.output(workspace, two)
-    assert :ok = Workspace.close(workspace)
+    assert {:error, %Error{code: :output_unavailable}} = Host.output(workspace, one)
+    assert {:ok, %{bytes: "second\n", done?: true}} = Host.output(workspace, two)
+    assert :ok = Host.close(workspace)
   end
 
   defp verify_retry(profile, tool, script, store) do
@@ -128,33 +126,33 @@ defmodule Jido.Workspace.Examples.BuildAndReviewTest do
     assert [first.digest] == File.ls!(store)
 
     revised = "REPORT\nREVISED REPORT\n"
-    assert :ok = Workspace.write(workspace, @draft, "revised report\n")
+    assert :ok = Host.write(workspace, @draft, "revised report\n")
 
     assert {:error, %{stage: :test, reason: %Execution{status: :exited, exit_status: 1}}} =
              BuildAndReview.run(workspace, build, test, output)
 
     assert stage_output(:build) == "building report\n"
     assert stage_output(:test) =~ "built report differs from expected"
-    assert {:ok, ^revised} = Workspace.read(workspace, @product)
+    assert {:ok, ^revised} = Host.read(workspace, @product)
     assert [first.digest] == File.ls!(store)
 
-    assert :ok = Workspace.write(workspace, @expected, revised)
+    assert :ok = Host.write(workspace, @expected, revised)
     assert {:ok, second} = BuildAndReview.run(workspace, build, test, output)
     assert first.digest != second.digest
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.close(workspace)
 
     verify_handoff(first, @report)
     verify_handoff(second, revised)
   end
 
   defp prepare(profile, script) do
-    assert {:ok, workspace} = Workspace.open(profile: profile)
-    assert :ok = Workspace.mkdir(workspace, "app")
-    assert :ok = Workspace.write(workspace, @draft, "quarterly report\n")
-    assert :ok = Workspace.write(workspace, @expected, @report)
+    assert {:ok, workspace} = Host.open(profile: profile)
+    assert :ok = Host.mkdir(workspace, "app")
+    assert :ok = Host.write(workspace, @draft, "quarterly report\n")
+    assert :ok = Host.write(workspace, @expected, @report)
 
     assert :ok =
-             Workspace.write(workspace, "app/" <> script, File.read!(Path.join(__DIR__, script)))
+             Host.write(workspace, "app/" <> script, File.read!(Path.join(__DIR__, script)))
 
     workspace
   end
@@ -185,17 +183,17 @@ defmodule Jido.Workspace.Examples.BuildAndReviewTest do
     json = Jason.encode!(snapshot)
 
     Task.async(fn ->
-      assert {:ok, workspace} = Workspace.open(profile: :reviewer, from: Jason.decode!(json))
+      assert {:ok, workspace} = Host.open(profile: :reviewer, from: Jason.decode!(json))
 
       try do
-        assert {:ok, ^report} = Workspace.read(workspace, @product)
+        assert {:ok, ^report} = Host.read(workspace, @product)
 
         assert {:error, %Error{code: :policy_denied}} =
-                 Workspace.write(workspace, @product, "edit")
+                 Host.write(workspace, @product, "edit")
 
-        assert {:error, %Error{code: :policy_denied}} = Workspace.save(workspace)
+        assert {:error, %Error{code: :policy_denied}} = Host.save(workspace)
       after
-        assert :ok = Workspace.close(workspace)
+        assert :ok = Host.close(workspace)
       end
     end)
     |> Task.await(10_000)

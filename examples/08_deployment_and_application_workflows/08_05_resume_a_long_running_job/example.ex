@@ -3,20 +3,20 @@ Code.require_file(
   __DIR__
 )
 
-defmodule Jido.Workspace.Examples.ResumeJob do
+defmodule Jido.Realm.Host.Examples.ResumeJob do
   @moduledoc "Publish the verified report from a completed job after the host has retired its lease."
 
-  alias Jido.Workspace
-  alias Jido.Workspace.CommandRef
-  alias Jido.Workspace.Examples.PublishReviewedGit
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.CommandRef
+  alias Jido.Realm.Host.Examples.PublishReviewedGit
 
   def publish(reference, report_path, repo, expected_head) do
     with {:ok, command} <- CommandRef.parse(reference),
-         {:ok, status} <- Workspace.recover_command(:recovery, command, :inspect),
+         {:ok, status} <- Host.recover_command(:recovery, command, :inspect),
          :ok <- require_success(status),
-         {:ok, workspace} <- Workspace.open(profile: :run, infrastructure: command.infrastructure),
+         {:ok, workspace} <- Host.open(profile: :run, infrastructure: command.infrastructure),
          {:ok, snapshot} <- save_and_close(workspace),
-         {:ok, review} <- Workspace.open(profile: :review, from: snapshot),
+         {:ok, review} <- Host.open(profile: :review, from: snapshot),
          {:ok, report} <- read_and_close(review, report_path),
          :ok <- verify(report),
          {:ok, prepared} <- PublishReviewedGit.prepare(repo, expected_head, report),
@@ -32,13 +32,13 @@ defmodule Jido.Workspace.Examples.ResumeJob do
     do: {:error, {:job_failed, status}}
 
   defp save_and_close(workspace) do
-    result = Workspace.save(workspace)
-    with :ok <- Workspace.close(workspace), do: result
+    result = Host.save(workspace)
+    with :ok <- Host.close(workspace), do: result
   end
 
   defp read_and_close(workspace, path) do
-    result = Workspace.read(workspace, path)
-    with :ok <- Workspace.close(workspace), do: result
+    result = Host.read(workspace, path)
+    with :ok <- Host.close(workspace), do: result
   end
 
   defp verify("complete\n"), do: :ok

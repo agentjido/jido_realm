@@ -5,14 +5,14 @@ Code.require_file(
 
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.ResumeJobTest do
+defmodule Jido.Realm.Host.Examples.ResumeJobTest do
   use ExUnit.Case, async: false
 
-  import Jido.Workspace.Examples.RecoverySupport
+  import Jido.Realm.Host.Examples.RecoverySupport
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution}
-  alias Jido.Workspace.Examples.{MachinePool, RecoveryHost, ResumeJob}
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution}
+  alias Jido.Realm.Host.Examples.{MachinePool, RecoveryHost, ResumeJob}
 
   @moduletag :integration
   @moduletag :tmp_dir
@@ -25,9 +25,9 @@ defmodule Jido.Workspace.Examples.ResumeJobTest do
   setup %{tmp_dir: root} do
     preserve_configuration()
     fixture = fixture(root)
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
     review = %{profiles.memory | policy: :read_only}
-    Application.put_env(:jido_workspace, :profiles, Map.put(profiles, :review, review))
+    Application.put_env(:jido_realm, :profiles, Map.put(profiles, :review, review))
 
     repo = Path.join(root, "results.git")
     git!(root, ["init", "--bare", "--template=", "--initial-branch=reviewed", repo])
@@ -59,9 +59,9 @@ defmodule Jido.Workspace.Examples.ResumeJobTest do
 
     script = """
     spawn(fn ->
-      {:ok, command} = reference_file |> File.read!() |> Jason.decode!() |> Jido.Workspace.CommandRef.parse()
-      {:ok, workspace} = Jido.Workspace.open(profile: :run, infrastructure: command.infrastructure)
-      Jido.Workspace.run(workspace, ["write-report"], command: command)
+      {:ok, command} = reference_file |> File.read!() |> Jason.decode!() |> Jido.Realm.Host.CommandRef.parse()
+      {:ok, workspace} = Jido.Realm.Host.open(profile: :run, infrastructure: command.infrastructure)
+      Jido.Realm.Host.run(workspace, ["write-report"], command: command)
     end)
     :submitted
     """
@@ -113,16 +113,16 @@ defmodule Jido.Workspace.Examples.ResumeJobTest do
     assert git!(repo, ["rev-parse", "#{commit}^"]) == base <> "\n"
 
     assert {:ok, review} =
-             Workspace.open(profile: :review, from: Jason.decode!(Jason.encode!(snapshot)))
+             Host.open(profile: :review, from: Jason.decode!(Jason.encode!(snapshot)))
 
     try do
-      assert {:ok, "complete\n"} = Workspace.read(review, report_path)
-      assert {:ok, "started\n"} = Workspace.read(review, wrong_path)
+      assert {:ok, "complete\n"} = Host.read(review, report_path)
+      assert {:ok, "started\n"} = Host.read(review, wrong_path)
 
       assert {:error, %Error{code: :policy_denied}} =
-               Workspace.write(review, report_path, "changed")
+               Host.write(review, report_path, "changed")
     after
-      assert :ok = Workspace.close(review)
+      assert :ok = Host.close(review)
     end
 
     assert {:ok, %{id: ^machine_id, running: true, started_at: ^started_at}} =
@@ -136,18 +136,18 @@ defmodule Jido.Workspace.Examples.ResumeJobTest do
     report_path =
       Path.relative_to(Path.join(RecoveryHost.job_path(tree, reference), "report"), tree)
 
-    assert {:ok, workspace} = Workspace.open(profile: :run, infrastructure: machine)
-    assert :ok = Workspace.write(workspace, report_path, "complete\n")
+    assert {:ok, workspace} = Host.open(profile: :run, infrastructure: machine)
+    assert :ok = Host.write(workspace, report_path, "complete\n")
 
-    runner = Task.async(fn -> Workspace.run(workspace, ["write-report"], command: reference) end)
+    runner = Task.async(fn -> Host.run(workspace, ["write-report"], command: reference) end)
     assert :ok = await_start(tree, reference)
 
     assert {:ok, %{status: :exited, exit_status: status}} =
-             Workspace.recover_command(:recovery, reference, :stop)
+             Host.recover_command(:recovery, reference, :stop)
 
     assert status != 0
     assert {:ok, %Execution{exit_status: ^status}} = Task.await(runner, 15_000)
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.close(workspace)
 
     assert {:error, {:job_failed, ^status}} =
              ResumeJob.publish(reference, report_path, repo, base)
@@ -156,8 +156,7 @@ defmodule Jido.Workspace.Examples.ResumeJobTest do
   end
 
   defp recover(peer, reference, action, opts \\ []),
-    do:
-      :peer.call(peer, Workspace, :recover_command, [:recovery, reference, action, opts], 10_000)
+    do: :peer.call(peer, Host, :recover_command, [:recovery, reference, action, opts], 10_000)
 
   defp publish(peer, reference, path, repo, base),
     do: :peer.call(peer, ResumeJob, :publish, [reference, path, repo, base], 20_000)

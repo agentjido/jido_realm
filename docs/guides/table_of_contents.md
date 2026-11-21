@@ -1,41 +1,41 @@
-# Workspace guides
+# Realm guides
 
-Use this index to find the Workspace workflow, supporting APIs, and runnable
+Use this index to find Realm workflows, supporting APIs, and runnable
 examples. Reviewed on 2026-11-19.
 
 ## Start here
 
-- [Install from a local checkout](../../README.md#use-from-another-project)
-- [Open one working tree](../../README.md#open-one-working-tree) to edit files,
+- [Install from a local checkout](../../HOST.md#use-from-another-project)
+- [Open one working tree](../../HOST.md#open-one-working-tree) to edit files,
   run a command, save the result, and reopen it for review.
-- [Run the numbered examples](https://github.com/agentjido/jido_workspace/tree/main/examples)
+- [Run the numbered examples](https://github.com/agentjido/jido_realm/tree/main/examples)
   for workflows that exercise the public API.
 
 ## Work with files and commands
 
-- `Jido.Workspace` covers relative paths, revision-checked edits, file search,
+- `Jido.Realm.Host` covers relative paths, revision-checked edits, file search,
   and large file reads and writes.
-- Use `Jido.Workspace.run/3` for literal arguments and a working directory.
-  Use `Jido.Workspace.batch/2` for ordered edits and commands.
-- Use `Jido.Workspace.info/1` and `Jido.Workspace.output/3` to inspect a live
-  command. Use `Jido.Workspace.cancel/2` to request a stop.
+- Use `Jido.Realm.Host.run/3` for literal arguments and a working directory.
+  Use `Jido.Realm.Host.batch/2` for ordered edits and commands.
+- Use `Jido.Realm.Host.info/1` and `Jido.Realm.Host.output/3` to inspect a live
+  command. Use `Jido.Realm.Host.cancel/2` to request a stop.
 
 ## Choose an execution environment
 
-- `Jido.Workspace.Profile` defines the provider, tools, limits, and required
-  capabilities. `Jido.Workspace.Policy` defines the operations it grants.
+- `Jido.Realm.Host.Profile` defines the provider, tools, limits, and required
+  capabilities. `Jido.Realm.Host.Policy` defines the operations it grants.
 - [Sandbox guide](../../SANDBOX.md) covers local processes, containers,
   service lifetimes, and cleanup. Check the provider's capabilities before
   you depend on an isolation or cancellation guarantee.
-- `Jido.Workspace.Provider` defines the callbacks for hosts that supply their
+- `Jido.Realm.Host.Provider` defines the callbacks for hosts that supply their
   own file tree and runner or attach to persistent infrastructure.
 
 ## Save, recover, and deploy
 
-- Use `Jido.Workspace.save/1` for a portable tree. Keep its
-  `Jido.Workspace.Snapshot` reference to [reopen it for review](../../README.md#open-one-working-tree).
-- Use `Jido.Workspace.InfrastructureRef` to identify a persistent resource.
-  Use `Jido.Workspace.CommandRef` and `Jido.Workspace.recover_command/4` to
+- Use `Jido.Realm.Host.save/1` for a portable tree. Keep its
+  `Jido.Realm.Host.Snapshot` reference to [reopen it for review](../../HOST.md#open-one-working-tree).
+- Use `Jido.Realm.Host.InfrastructureRef` to identify a persistent resource.
+  Use `Jido.Realm.Host.CommandRef` and `Jido.Realm.Host.recover_command/4` to
   inspect, wait for, or stop a job after client loss. The host confirms old
   writers have stopped before it grants replacement write access.
 - [Deploy guide](../../DEPLOY.md) covers [saved trees](../../DEPLOY.md#saved-workspace-trees),
@@ -44,21 +44,21 @@ examples. Reviewed on 2026-11-19.
 
 ## Use Shell and VFS directly
 
-- [Shell sessions](../shell/shell.md) covers Shell commands, mounts, and backends.
-- [Virtual filesystems](../vfs/vfs.md) covers storage adapters, streaming,
+- [Shell sessions](https://github.com/agentjido/jido_shell) covers Shell commands, mounts, and backends.
+- [Virtual filesystems](https://github.com/agentjido/jido_vfs) covers storage adapters, streaming,
   versioning, and atomic memory captures.
-- [VFS in Jido agents](../vfs/jido-agent-integration.md) describes how a host
+- [VFS in Jido agents](https://github.com/agentjido/jido_vfs/blob/main/docs/jido-agent-integration.md) describes how a host
   application can expose selected operations as Actions.
 
 ## Maintain the package
 
-- [VFS adapter checklist](../vfs/adapter-onboarding-checklist.md)
-- [Shell guardrails](../shell/GUARDRAILS.md) and [migration](../shell/MIGRATION.md)
+- [VFS adapter checklist](https://github.com/agentjido/jido_vfs/blob/main/docs/adapter-onboarding-checklist.md)
+- [Shell guardrails](https://github.com/agentjido/jido_shell/blob/main/GUARDRAILS.md) and [migration](https://github.com/agentjido/jido_shell/blob/main/MIGRATION.md)
 - [Contributing](../../CONTRIBUTING.md), [change log](../../CHANGELOG.md), and
   [source imports](../source-imports.md)
 - [License](../../LICENSE)
 
 ## Earlier designs
 
-- [Workspace API proposal](../../API_SPEC.md)
-- [Workspace asset lifecycle proposal](../workspace-asset-lifecycle.md)
+- [Realm API proposal](../../API_SPEC.md)
+- [Realm asset lifecycle proposal](../workspace-asset-lifecycle.md)

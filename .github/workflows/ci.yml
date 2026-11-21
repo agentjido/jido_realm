@@ -22,6 +22,11 @@ jobs:
     secrets: inherit
     with:
       credo_command: mix credo --strict
-      hex_package_command: mix hex.build
+      changelog_guard_mode: no_unreleased
+      # Git pins provide the Shell and VFS APIs required by Realm.
+      validate_hex_package: false
       docs_command: mix docs -f html
-      test_command: mix test
+      test_command: >-
+        mix test &&
+        MIX_ENV=test mix test.realm &&
+        MIX_ENV=test mix test.integration

@@ -1,0 +1,20 @@
+defmodule RealmDemo.Application do
+  use Application
+
+  @impl true
+  def start(_type, _args) do
+    port = System.get_env("PORT")
+    Application.put_env(:phoenix, :json_library, JSON)
+
+    Application.put_env(:realm_edit_demo, RealmDemo.Endpoint,
+      adapter: Bandit.PhoenixAdapter,
+      http: [ip: {0, 0, 0, 0}, port: String.to_integer(port || "8080")],
+      url: [host: "localhost"],
+      secret_key_base: String.duplicate("realm-demo", 8),
+      render_errors: [formats: [html: RealmDemo.Errors], layout: false],
+      server: is_binary(port)
+    )
+
+    Supervisor.start_link([RealmDemo.Endpoint], strategy: :one_for_one)
+  end
+end

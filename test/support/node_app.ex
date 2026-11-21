@@ -1,6 +1,6 @@
-defmodule Jido.Workspace.Deploy.Test.NodeApp do
+defmodule Jido.Realm.Host.Deploy.Test.NodeApp do
   @moduledoc false
-  alias Jido.Workspace.Deploy.{Artifact, Recipe, Snapshot}
+  alias Jido.Realm.Host.Deploy.{Artifact, Recipe, Snapshot}
 
   def artifact(version, opts \\ []) do
     server = """

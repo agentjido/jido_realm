@@ -10,7 +10,7 @@ Project owner
 
 ## Purpose
 
-Help the owner develop `jido_workspace` as an Elixir and OTP library for working
+Help the owner develop `jido_realm` as an Elixir and OTP library for working
 files, execution, and saved assets.
 
 ## Responsibilities

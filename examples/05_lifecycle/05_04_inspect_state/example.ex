@@ -1,14 +1,14 @@
-defmodule Jido.Workspace.Examples.ObserveCommand do
+defmodule Jido.Realm.Host.Examples.ObserveCommand do
   @moduledoc "Forward command events for one workspace to the caller."
 
-  alias Jido.Workspace
+  alias Jido.Realm.Host
 
-  @events [[:jido_workspace, :command, :start], [:jido_workspace, :command, :stop]]
+  @events [[:jido_realm, :command, :start], [:jido_realm, :command, :stop]]
 
   def attach(workspace) do
     handler = {__MODULE__, make_ref()}
 
-    with {:ok, %{id: workspace_id}} <- Workspace.info(workspace),
+    with {:ok, %{id: workspace_id}} <- Host.info(workspace),
          :ok <-
            :telemetry.attach_many(
              handler,
@@ -22,7 +22,7 @@ defmodule Jido.Workspace.Examples.ObserveCommand do
 
   @doc false
   def forward(
-        [:jido_workspace, :command, event],
+        [:jido_realm, :command, event],
         measures,
         %{workspace_id: id} = data,
         {pid, id}

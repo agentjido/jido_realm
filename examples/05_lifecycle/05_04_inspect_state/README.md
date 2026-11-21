@@ -1,19 +1,19 @@
 # 05.04 Inspect workspace and command state
 
-Use `Workspace.info/1` to inspect a profiled workspace. It reports the
+Use `Host.info/1` to inspect a profiled workspace. It reports the
 current phase and the ID of a command while it is active. The same ID
 identifies the result and the command events. Read-only profiles can
 inspect workspace status.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
 {:ok, %{id: workspace_id, phase: phase, active_execution_id: execution_id}} =
-  Workspace.info(workspace)
+  Host.info(workspace)
 ```
 
 The phases are `:ready`, `:running`, `:saving`, `:closing`, and
-`:quiescence_unknown`. If Workspace cannot confirm that writers have
+`:quiescence_unknown`. If Realm cannot confirm that writers have
 stopped, it reports `:quiescence_unknown` and refuses writes and saves.
 An expired handle returns `:closed`.
 
@@ -25,12 +25,12 @@ observe multiple workspaces. Detach the handler when observation ends.
 [Example handler](example.ex)
 
 ```elixir
-alias Jido.Workspace.Examples.ObserveCommand
+alias Jido.Realm.Host.Examples.ObserveCommand
 
 {:ok, handler} = ObserveCommand.attach(workspace)
 
 try do
-  {:ok, execution} = Workspace.run(workspace, ["cat", "report.txt"], output_limit: 200)
+  {:ok, execution} = Host.run(workspace, ["cat", "report.txt"], output_limit: 200)
   id = execution.id
 
   receive do
@@ -42,19 +42,19 @@ after
 end
 ```
 
-For each admitted command, Workspace emits the following Telemetry events.
+For each admitted command, Realm emits the following Telemetry events.
 
 | Event | Measurement | Metadata |
 | --- | --- | --- |
-| `[:jido_workspace, :command, :start]` | `system_time` in native time units | `workspace_id` and `execution_id` |
-| `[:jido_workspace, :command, :stop]` | `duration_ms` | Both IDs. The status and exit status for a command result, or `status: :error` and `error_code` for an operation error. |
+| `[:jido_realm, :command, :start]` | `system_time` in native time units | `workspace_id` and `execution_id` |
+| `[:jido_realm, :command, :stop]` | `duration_ms` | Both IDs. The status and exit status for a command result, or `status: :error` and `error_code` for an operation error. |
 
 Use `execution.id` on success and `error.details.execution_id` on an error
 after admission. A command can exit with a nonzero status and still return
 a result with output. Refused requests have no execution ID.
 
 Keep handlers short. They run in the workspace controller. Send the event
-to another process for further work, including calls to `Workspace.info/1`.
+to another process for further work, including calls to `Host.info/1`.
 Telemetry is available to trusted code in the same BEAM. Event metadata
 excludes command arguments, file paths, output, and detailed errors.
 

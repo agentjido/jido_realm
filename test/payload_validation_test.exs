@@ -1,9 +1,9 @@
-defmodule Jido.Workspace.PayloadValidationTest do
+defmodule Jido.Realm.Host.PayloadValidationTest do
   use ExUnit.Case, async: true
-  alias Jido.Workspace.Deploy.{Artifact, Recipe, Snapshot}
-  alias Jido.Workspace.Error
-  alias Jido.Workspace.Sandbox
-  alias Jido.Workspace.Sandbox.Files
+  alias Jido.Realm.Host.Deploy.{Artifact, Recipe, Snapshot}
+  alias Jido.Realm.Host.Error
+  alias Jido.Realm.Host.Sandbox
+  alias Jido.Realm.Host.Sandbox.Files
 
   @tag :tmp_dir
   test "snapshots refuse malformed entries and detect missing or changed files", %{tmp_dir: root} do

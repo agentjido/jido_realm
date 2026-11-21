@@ -1,10 +1,10 @@
-defmodule Jido.Workspace.Examples.MachinePool do
+defmodule Jido.Realm.Host.Examples.MachinePool do
   @moduledoc false
 
-  alias Jido.Workspace.InfrastructureRef
+  alias Jido.Realm.Host.InfrastructureRef
 
   @provider "local-machines"
-  @label "dev.jido.workspace.example.machine-pool"
+  @label "dev.jido.realm.example.machine-pool"
   @enforce_keys [:pid, :docker, :endpoint, :tag, :root, :image]
   defstruct @enforce_keys
 

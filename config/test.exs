@@ -1,4 +1,4 @@
 import Config
 
 config :logger, level: :warning
-config :jido_workspace, vfs_test_mode: true
+config :jido_vfs, test_mode: true

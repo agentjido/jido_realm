@@ -1,7 +1,7 @@
-defmodule Jido.Workspace.Sandbox.LifecycleTest do
+defmodule Jido.Realm.Host.Sandbox.LifecycleTest do
   use ExUnit.Case, async: false
   @moduletag :integration
-  alias Jido.Workspace.Sandbox
+  alias Jido.Realm.Host.Sandbox
 
   test "BEAM services survive caller exit and handle close; destroy stops them" do
     parent = self()

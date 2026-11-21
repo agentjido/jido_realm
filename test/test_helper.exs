@@ -3,9 +3,9 @@ minio_available? =
   try do
     # Capture stdio to suppress minio's JSON output
     ExUnit.CaptureIO.capture_io(fn ->
-      {:ok, _} = JidoVfsTest.Minio.start_link()
-      :ok = JidoVfsTest.Minio.wait_for_ready()
-      JidoVfsTest.Minio.initialize_bucket("default")
+      {:ok, _} = Jido.Realm.TestSupport.Minio.start_link()
+      :ok = Jido.Realm.TestSupport.Minio.wait_for_ready()
+      Jido.Realm.TestSupport.Minio.initialize_bucket("default")
     end)
 
     true
@@ -25,7 +25,20 @@ Application.put_env(:jido_vfs, :minio_available, minio_available?)
 Application.put_env(:jido_vfs, :git_available, git_available?)
 
 # Build exclusion list
-excludes = [:integration, :sprite, :sprites, :requires_cli, :flaky, :ssh_integration]
+excludes = [
+  :integration,
+  :sprite,
+  :sprites,
+  :requires_cli,
+  :flaky,
+  :ssh_integration,
+  :apple_container,
+  :browser,
+  :docker,
+  :live_sprite,
+  :lmstudio
+]
+
 excludes = if minio_available?, do: excludes, else: [:s3 | excludes]
 excludes = if git_available?, do: excludes, else: [:git | excludes]
 

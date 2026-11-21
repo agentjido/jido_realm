@@ -9,7 +9,7 @@ while another workspace can continue its work.
 ```elixir
 report = %{provider: :memory, policy: :full_access, store: "reports"}
 
-config :jido_workspace,
+config :jido_realm,
   profiles: %{
     short_report: Map.put(report, :limits, %{timeout_ms: 5_000, output_limit: 5}),
     wide_report: Map.put(report, :limits, %{timeout_ms: 10_000, output_limit: 8})
@@ -17,7 +17,7 @@ config :jido_workspace,
 ```
 
 Set `output_limit` in bytes and `timeout_ms` in milliseconds. Each cap
-applies to one command. Workspace uses the lower value from the profile
+applies to one command. Realm uses the lower value from the profile
 and the run options. A caller can use a lower limit for a single command.
 Use a [configured snapshot store](../../README.md#save-and-reopen-after-a-beam-restart)
 to keep both results after close.
@@ -29,24 +29,24 @@ Use two host-supervised owners. The report reads run in caller tasks.
 [Report task](example.ex)
 
 ```elixir
-alias Jido.Workspace
-alias Jido.Workspace.Examples.ConcurrentReports
+alias Jido.Realm.Host
+alias Jido.Realm.Host.Examples.ConcurrentReports
 
-{:ok, first} = Workspace.open(profile: :short_report, owner: first_owner)
-{:ok, second} = Workspace.open(profile: :wide_report, owner: second_owner)
-:ok = Workspace.write(first, "report.txt", "alpha-message")
-:ok = Workspace.write(second, "report.txt", "beta-message")
+{:ok, first} = Host.open(profile: :short_report, owner: first_owner)
+{:ok, second} = Host.open(profile: :wide_report, owner: second_owner)
+:ok = Host.write(first, "report.txt", "alpha-message")
+:ok = Host.write(second, "report.txt", "beta-message")
 
 first_read = ConcurrentReports.read(first)
 second_read = ConcurrentReports.read(second)
 
 {:ok, %{output: "alpha", truncated: true}} = Task.await(first_read, 15_000)
-{:ok, first_snapshot} = Workspace.save(first)
-:ok = Workspace.close(first)
+{:ok, first_snapshot} = Host.save(first)
+:ok = Host.close(first)
 
 {:ok, %{output: "beta-mes", truncated: true}} = Task.await(second_read, 15_000)
-{:ok, second_snapshot} = Workspace.save(second)
-:ok = Workspace.close(second)
+{:ok, second_snapshot} = Host.save(second)
+:ok = Host.close(second)
 ```
 
 The same caller code works with Docker profiles. Set the base profile

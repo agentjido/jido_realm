@@ -1,7 +1,7 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.StoreS3ArtifactTest do
+defmodule Jido.Realm.Host.Examples.StoreS3ArtifactTest do
   use ExUnit.Case, async: false
 
   @moduletag :integration
@@ -18,9 +18,9 @@ defmodule Jido.Workspace.Examples.StoreS3ArtifactTest do
   alias Jido.VFS
   alias Jido.VFS.Adapter.S3
   alias Jido.VFS.Errors.{AdapterError, FileNotFound}
-  alias Jido.Workspace
-  alias Jido.Workspace.Execution
-  alias Jido.Workspace.Examples.{LifecycleSupport, StoreS3Artifact}
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.Execution
+  alias Jido.Realm.Host.Examples.{LifecycleSupport, StoreS3Artifact}
 
   defmodule InterruptedPut do
     @moduledoc false
@@ -78,16 +78,16 @@ defmodule Jido.Workspace.Examples.StoreS3ArtifactTest do
 
   setup %{tmp_dir: root} do
     LifecycleSupport.configure(Path.join(root, "snapshots"))
-    %{memory: memory, docker: docker} = Application.fetch_env!(:jido_workspace, :profiles)
+    %{memory: memory, docker: docker} = Application.fetch_env!(:jido_realm, :profiles)
 
-    Application.put_env(:jido_workspace, :profiles, %{
+    Application.put_env(:jido_realm, :profiles, %{
       scratch: %{memory | policy: [:read, :write, :save]},
       review: %{memory | policy: [:read, :import, :execute]},
       docker_review: %{docker | policy: [:read, :import, :execute]}
     })
 
     prefix = "workspace-artifacts/" <> Base.encode16(:crypto.strong_rand_bytes(12), case: :lower)
-    config = JidoVfsTest.Minio.config()
+    config = Jido.Realm.TestSupport.Minio.config()
     destination = destination(config, prefix)
     on_exit(fn -> assert :ok = VFS.clear(destination) end)
     %{destination: destination, config: config, prefix: prefix}
@@ -194,31 +194,31 @@ defmodule Jido.Workspace.Examples.StoreS3ArtifactTest do
   end
 
   defp save_candidate(report) do
-    assert {:ok, scratch} = Workspace.open(profile: :scratch)
+    assert {:ok, scratch} = Host.open(profile: :scratch)
 
     try do
-      assert :ok = Workspace.write(scratch, "report.txt", report)
-      assert :ok = Workspace.write(scratch, "draft.txt", "Private notes")
-      assert {:ok, snapshot} = Workspace.save(scratch)
-      assert :ok = Workspace.write(scratch, "report.txt", "Unsaved edit")
+      assert :ok = Host.write(scratch, "report.txt", report)
+      assert :ok = Host.write(scratch, "draft.txt", "Private notes")
+      assert {:ok, snapshot} = Host.save(scratch)
+      assert :ok = Host.write(scratch, "report.txt", "Unsaved edit")
       snapshot |> Jason.encode!() |> Jason.decode!()
     after
-      assert :ok = Workspace.close(scratch)
+      assert :ok = Host.close(scratch)
     end
   end
 
   defp read_report(reference, profile) do
-    assert {:ok, review} = Workspace.open(profile: profile, from: reference)
+    assert {:ok, review} = Host.open(profile: profile, from: reference)
 
     try do
-      assert {:ok, report} = Workspace.read(review, "report.txt")
+      assert {:ok, report} = Host.read(review, "report.txt")
 
       assert {:ok, %Execution{exit_status: 0, output: ^report}} =
-               Workspace.run(review, ["cat", "report.txt"])
+               Host.run(review, ["cat", "report.txt"])
 
       report
     after
-      assert :ok = Workspace.close(review)
+      assert :ok = Host.close(review)
     end
   end
 

@@ -3,14 +3,14 @@
 Keep the snapshot reference until the next open succeeds. For a profiled
 workspace, set `timeout_ms:` to limit the wait for the provider to allocate
 and restore the tree. If the wait expires, the call returns `:open_timeout`
-with no workspace handle. Workspace releases any resources that arrive late.
+with no workspace handle. Realm releases any resources that arrive late.
 [Example](example.ex)
 
 ```elixir
-alias Jido.Workspace
-alias Jido.Workspace.Error
+alias Jido.Realm.Host
+alias Jido.Realm.Host.Error
 
-case Workspace.open(profile: :docker, from: snapshot, timeout_ms: 2_000) do
+case Host.open(profile: :docker, from: snapshot, timeout_ms: 2_000) do
   {:ok, workspace} ->
     {:ready, workspace}
 
@@ -25,7 +25,7 @@ case Workspace.open(profile: :docker, from: snapshot, timeout_ms: 2_000) do
 end
 ```
 
-Call `Workspace.open/1` again with the saved reference to request a new
+Call `Host.open/1` again with the saved reference to request a new
 disposable tree. The same call works with `profile: :memory`. A new tree
 has separate resources from the expired attempt. Keep the saved reference
 and its store available across both attempts.
@@ -48,7 +48,7 @@ user. [Tests](example_test.exs)
 ## API fit and gaps
 
 The default allocation wait is 30 seconds. Profile resolution and loading
-the saved snapshot occur before this wait. Workspace monitors the caller
+the saved snapshot occur before this wait. Realm monitors the caller
 until it accepts the handle and monitors the owner for the workspace
 lifetime.
 

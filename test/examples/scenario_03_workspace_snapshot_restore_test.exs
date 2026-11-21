@@ -1,36 +1,36 @@
-defmodule Jido.Workspace.Integration.Scenario03WorkspaceSnapshotRestoreTest do
+defmodule Jido.Realm.Host.Integration.Scenario03WorkspaceSnapshotRestoreTest do
   use ExUnit.Case, async: false
-  alias Jido.Workspace
+  alias Jido.Realm.Host
   @moduletag :integration
 
   test "memory capture restores a complete tree through checked replacement" do
-    {:ok, ws} = Workspace.open()
+    {:ok, ws} = Host.open()
 
     try do
-      :ok = Workspace.write(ws, "/original", "saved")
-      :ok = Workspace.mkdir(ws, "/empty")
-      {:ok, capture, _} = Workspace.capture(ws)
-      :ok = Workspace.delete(ws, "/original")
-      :ok = Workspace.write(ws, "/new", "new")
-      {:ok, _, revision} = Workspace.capture(ws)
-      {:ok, _} = Workspace.replace(ws, capture, expected: revision)
-      assert {:ok, "saved"} = Workspace.read(ws, "/original")
-      assert {:error, %Jido.Workspace.Error{code: :not_found}} = Workspace.read(ws, "/new")
-      assert {:ok, []} = Workspace.list(ws, "/empty")
+      :ok = Host.write(ws, "/original", "saved")
+      :ok = Host.mkdir(ws, "/empty")
+      {:ok, capture, _} = Host.capture(ws)
+      :ok = Host.delete(ws, "/original")
+      :ok = Host.write(ws, "/new", "new")
+      {:ok, _, revision} = Host.capture(ws)
+      {:ok, _} = Host.replace(ws, capture, expected: revision)
+      assert {:ok, "saved"} = Host.read(ws, "/original")
+      assert {:error, %Jido.Realm.Host.Error{code: :not_found}} = Host.read(ws, "/new")
+      assert {:ok, []} = Host.list(ws, "/empty")
     after
-      Workspace.close(ws)
+      Host.close(ws)
     end
   end
 
   @tag :tmp_dir
   test "local storage refuses an atomic capture instead of walking live files", %{tmp_dir: dir} do
-    {:ok, ws} = Workspace.open(adapter: Jido.VFS.Adapter.Local, adapter_opts: [prefix: dir])
+    {:ok, ws} = Host.open(adapter: Jido.VFS.Adapter.Local, adapter_opts: [prefix: dir])
 
     try do
-      assert {:error, %Jido.Workspace.Error{code: :unsupported_capability}} =
-               Workspace.capture(ws)
+      assert {:error, %Jido.Realm.Host.Error{code: :unsupported_capability}} =
+               Host.capture(ws)
     after
-      Workspace.close(ws)
+      Host.close(ws)
     end
   end
 end

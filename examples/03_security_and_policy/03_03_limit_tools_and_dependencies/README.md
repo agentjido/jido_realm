@@ -4,9 +4,9 @@ Set `tools:` on the host profile to list the exact command names a
 caller can start. Use the same report workflow on memory and Docker.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
-Application.put_env(:jido_workspace, :profiles, %{
+Application.put_env(:jido_realm, :profiles, %{
   review_memory: %{provider: :memory, policy: :full_access, tools: ["cat"]},
   review_docker: %{
     provider: :docker,
@@ -16,15 +16,15 @@ Application.put_env(:jido_workspace, :profiles, %{
   }
 })
 
-{:ok, workspace} = Workspace.open(profile: :review_memory)
-:ok = Workspace.write(workspace, "report.txt", "Approved report\n")
+{:ok, workspace} = Host.open(profile: :review_memory)
+:ok = Host.write(workspace, "report.txt", "Approved report\n")
 {:ok, %{exit_status: 0, output: "Approved report\n"}} =
-  Workspace.run(workspace, ["cat", "report.txt"])
+  Host.run(workspace, ["cat", "report.txt"])
 
-{:error, %Workspace.Error{code: :policy_denied, details: %{action: :execute}}} =
-  Workspace.run(workspace, ["pwd"])
+{:error, %Host.Error{code: :policy_denied, details: %{action: :execute}}} =
+  Host.run(workspace, ["pwd"])
 
-:ok = Workspace.close(workspace)
+:ok = Host.close(workspace)
 ```
 
 Select `:review_docker` to use the installed image. The tests exercise both
@@ -40,7 +40,7 @@ before using the returned bytes.
 | A memory profile lists a tool outside the virtual tool set | Open returns `:invalid_profile`. |
 | A permitted Docker executable is missing and Docker confirms removal of the failed container | Run returns `:start_failed`. File edits and saves can continue. |
 | A running command exits with a nonzero code | Run returns an execution with that exit status. |
-| Workspace cannot confirm cleanup | Run returns `:quiescence_unknown`. Workspace blocks writes and saves. |
+| Realm cannot confirm cleanup | Run returns `:quiescence_unknown`. Realm blocks writes and saves. |
 
 The list controls the command entry point. The tool interprets its arguments
 and can start child processes where the provider permits them. The host

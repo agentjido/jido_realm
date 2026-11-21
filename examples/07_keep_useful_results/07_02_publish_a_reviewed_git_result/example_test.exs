@@ -1,21 +1,21 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.PublishReviewedGitTest do
+defmodule Jido.Realm.Host.Examples.PublishReviewedGitTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.Examples.{LifecycleSupport, PublishReviewedGit}
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.Examples.{LifecycleSupport, PublishReviewedGit}
 
   @branch "refs/heads/reviewed"
 
   setup %{tmp_dir: root} do
     LifecycleSupport.configure(Path.join(root, "snapshots"))
-    %{memory: memory, docker: docker} = Application.fetch_env!(:jido_workspace, :profiles)
+    %{memory: memory, docker: docker} = Application.fetch_env!(:jido_realm, :profiles)
 
-    Application.put_env(:jido_workspace, :profiles, %{
+    Application.put_env(:jido_realm, :profiles, %{
       scratch: %{memory | policy: [:read, :write, :save]},
       review: %{memory | policy: :read_only},
       docker_review: %{docker | policy: :read_only}
@@ -113,28 +113,28 @@ defmodule Jido.Workspace.Examples.PublishReviewedGitTest do
   end
 
   defp save_candidate(report) do
-    assert {:ok, workspace} = Workspace.open(profile: :scratch)
+    assert {:ok, workspace} = Host.open(profile: :scratch)
 
     try do
-      assert :ok = Workspace.write(workspace, "report.txt", report)
-      assert :ok = Workspace.write(workspace, "draft.txt", "Private notes\n")
-      assert {:ok, snapshot} = Workspace.save(workspace)
-      assert :ok = Workspace.write(workspace, "report.txt", "Unreviewed edit\n")
+      assert :ok = Host.write(workspace, "report.txt", report)
+      assert :ok = Host.write(workspace, "draft.txt", "Private notes\n")
+      assert {:ok, snapshot} = Host.save(workspace)
+      assert :ok = Host.write(workspace, "report.txt", "Unreviewed edit\n")
       snapshot |> Jason.encode!() |> Jason.decode!()
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 
   defp prepare(profile, repo, base, reference) do
-    assert {:ok, review} = Workspace.open(profile: profile, from: reference)
+    assert {:ok, review} = Host.open(profile: profile, from: reference)
 
     report =
       try do
-        assert {:ok, contents} = Workspace.read(review, "report.txt")
+        assert {:ok, contents} = Host.read(review, "report.txt")
         contents
       after
-        assert :ok = Workspace.close(review)
+        assert :ok = Host.close(review)
       end
 
     PublishReviewedGit.prepare(repo, base, report)

@@ -1,13 +1,17 @@
-# Imported source
+# Source provenance
 
-The following projects supply modules and tests included in this repository.
+Realm combines the agent-facing API and the host controls for environments,
+command recovery, and deployment. The repository retains the host
+implementation history. The imported Realm sources dated November 21, 2026
+are now part of this repository.
 
-| Project | Imported revision | Main paths |
-| --- | --- | --- |
-| Jido Shell | [3c585dd890376f16de5d38902ab7dd0124424a56](https://github.com/agentjido/jido_shell/tree/3c585dd890376f16de5d38902ab7dd0124424a56) | `lib/jido_shell*`, `lib/mix/tasks/jido_shell*`, `test/jido/shell`, `docs/shell` |
-| Jido VFS | [e2d2922e64904294b31cc6bb93c205e1f5b695cc](https://github.com/agentjido/jido_vfs/tree/e2d2922e64904294b31cc6bb93c205e1f5b695cc) | `lib/jido_vfs*`, `lib/mix/tasks/jido_vfs*`, `test/jido_vfs`, `docs/vfs` |
+The import contained 240 files. The SHA-256 digest of the sorted paths and
+file digests was
+`89bc93d6bd3bac9052e71079bc989a4adccc7eaafd10ca9c16f04b4dd0496e35`.
 
-Both projects carry the same copyright and Apache 2.0 license text as this
-repository. See [LICENSE](../LICENSE). The combined application uses the
-original Elixir namespaces, process names, and session events. The standalone
-repositories remain available as distinct sources.
+The standalone packages own their source and releases:
+
+- [Jido Shell](https://github.com/agentjido/jido_shell)
+- [Jido VFS](https://github.com/agentjido/jido_vfs)
+
+See [LICENSE](../LICENSE) for the Apache 2.0 terms.

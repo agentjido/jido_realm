@@ -1,16 +1,16 @@
-defmodule Jido.Workspace.Deploy.OTPTargetProtocolTest do
+defmodule Jido.Realm.Host.Deploy.OTPTargetProtocolTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag timeout: 120_000
 
-  alias Jido.Workspace.Deploy.OTP
-  alias Jido.Workspace.Sandbox
-  alias Jido.Workspace.TestSupport.TargetCoverage
+  alias Jido.Realm.Host.Deploy.OTP
+  alias Jido.Realm.Host.Sandbox
+  alias Jido.Realm.Host.TestSupport.TargetCoverage
 
   setup do
     {:ok, sandbox} = Sandbox.open()
     on_exit(fn -> Sandbox.destroy(sandbox) end)
-    artifacts = Jido.Workspace.Deploy.Test.Releases.build(Path.join(sandbox.root, "build"))
+    artifacts = Jido.Realm.Host.Deploy.Test.Releases.build(Path.join(sandbox.root, "build"))
     {:ok, target} = OTP.start(sandbox, "counter", artifacts["1"])
     TargetCoverage.start(target)
     %{target: target}
@@ -24,16 +24,16 @@ defmodule Jido.Workspace.Deploy.OTPTargetProtocolTest do
     assert {:ok, :error} = call(target, :status, ["missing"])
 
     assert {:ok, {:error, :unsupported}} =
-             OTP.call(target, :gen_server, :call, [:jido_workspace_deploy_target, :unknown])
+             OTP.call(target, :gen_server, :call, [:jido_realm_deploy_target, :unknown])
 
     assert {:ok, :ok} =
-             OTP.call(target, :gen_server, :cast, [:jido_workspace_deploy_target, :unknown])
+             OTP.call(target, :gen_server, :cast, [:jido_realm_deploy_target, :unknown])
 
     assert {:ok, :unknown} =
-             OTP.call(target, :erlang, :send, [:jido_workspace_deploy_target, :unknown])
+             OTP.call(target, :erlang, :send, [:jido_realm_deploy_target, :unknown])
 
     assert {:ok, ^before} = OTP.inspect(target)
-    assert {:ok, :ok} = OTP.call(target, :gen_server, :stop, [:jido_workspace_deploy_target])
+    assert {:ok, :ok} = OTP.call(target, :gen_server, :stop, [:jido_realm_deploy_target])
     assert {:ok, :ok} = call(target, :start, [])
     assert {:ok, after_restart} = OTP.inspect(target)
     assert after_restart.identity.release == before.identity.release
@@ -78,7 +78,7 @@ defmodule Jido.Workspace.Deploy.OTPTargetProtocolTest do
     assert {:ok, {:error, :busy}} =
              call(target, :install, ["second", before.identity, ~c"missing", nil, false])
 
-    assert {:ok, server} = OTP.call(target, :erlang, :whereis, [:jido_workspace_deploy_target])
+    assert {:ok, server} = OTP.call(target, :erlang, :whereis, [:jido_realm_deploy_target])
 
     assert {:ok, {:monitors, [{:process, worker}]}} =
              OTP.call(target, :erlang, :process_info, [server, :monitors])
@@ -117,7 +117,7 @@ defmodule Jido.Workspace.Deploy.OTPTargetProtocolTest do
   end
 
   defp call(target, function, args),
-    do: OTP.call(target, :jido_workspace_deploy_target, function, args)
+    do: OTP.call(target, :jido_realm_deploy_target, function, args)
 
   defp await(target, id, attempts \\ 100)
   defp await(_target, _id, 0), do: flunk("target operation did not finish")

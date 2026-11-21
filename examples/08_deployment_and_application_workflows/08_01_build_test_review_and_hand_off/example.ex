@@ -1,16 +1,16 @@
 Code.require_file("../../02_commands/02_02_stream_live_output/example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.BuildAndReview do
+defmodule Jido.Realm.Host.Examples.BuildAndReview do
   @moduledoc "Run two tool stages, follow the output, and save the checked tree."
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution}
-  alias Jido.Workspace.Examples.FollowOutput
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution}
+  alias Jido.Realm.Host.Examples.FollowOutput
 
   def run(workspace, build, test, on_output) do
     with :ok <- run_stage(workspace, :build, build, on_output),
          :ok <- run_stage(workspace, :test, test, on_output) do
-      Workspace.save(workspace)
+      Host.save(workspace)
     end
   end
 
@@ -28,7 +28,7 @@ defmodule Jido.Workspace.Examples.BuildAndReview do
         if id, do: follow(workspace, stage, id, on_output), else: :ok
       end)
 
-    result = Workspace.run(workspace, argv, Keyword.put(opts, :notify_start, {reader.pid, tag}))
+    result = Host.run(workspace, argv, Keyword.put(opts, :notify_start, {reader.pid, tag}))
     send(reader.pid, {tag, result})
     observed = Task.await(reader, :infinity)
 

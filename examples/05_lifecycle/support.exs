@@ -1,8 +1,8 @@
-defmodule Jido.Workspace.Examples.LifecycleSupport do
+defmodule Jido.Realm.Host.Examples.LifecycleSupport do
   @moduledoc false
 
   import ExUnit.Assertions
-  alias Jido.Workspace.Sandbox
+  alias Jido.Realm.Host.Sandbox
 
   def configure(root) do
     configure(:profiles, %{
@@ -20,13 +20,13 @@ defmodule Jido.Workspace.Examples.LifecycleSupport do
   end
 
   defp configure(key, value) do
-    previous = Application.fetch_env(:jido_workspace, key)
-    Application.put_env(:jido_workspace, key, value)
+    previous = Application.fetch_env(:jido_realm, key)
+    Application.put_env(:jido_realm, key, value)
 
     ExUnit.Callbacks.on_exit(fn ->
       case previous do
-        {:ok, value} -> Application.put_env(:jido_workspace, key, value)
-        :error -> Application.delete_env(:jido_workspace, key)
+        {:ok, value} -> Application.put_env(:jido_realm, key, value)
+        :error -> Application.delete_env(:jido_realm, key)
       end
     end)
   end
@@ -38,7 +38,7 @@ defmodule Jido.Workspace.Examples.LifecycleSupport do
   end
 
   def containers(sandbox, filters \\ []) do
-    label = "label=dev.jido.workspace.sandbox=" <> sandbox.id
+    label = "label=dev.jido.realm.sandbox=" <> sandbox.id
     {ids, 0} = docker(["ps", "--all", "--quiet", "--filter", label] ++ filters)
     String.split(ids)
   end

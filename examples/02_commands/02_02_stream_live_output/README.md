@@ -1,20 +1,20 @@
 # 02.02 Stream live output
 
 Run the command while a second process reads its output. Pass
-`notify_start: {reader_pid, reference}` to `Workspace.run/3` to send the
+`notify_start: {reader_pid, reference}` to `Host.run/3` to send the
 reader `{:workspace_command_started, reference, execution_id}` on
 admission. Use the ID even if the command finishes before the first
 read. A command refused before admission sends no notice. Use the run
 result to resolve that case.
 [Build and review](../../08_deployment_and_application_workflows/08_01_build_test_review_and_hand_off/README.md)
 
-You can also get the active ID with `Workspace.info/1` or observe the
+You can also get the active ID with `Host.info/1` or observe the
 command start event.
 [Command events](../../05_lifecycle/05_04_inspect_state/README.md)
 
 ```elixir
-{:ok, slice} = Workspace.output(workspace, execution_id, 0)
-{:ok, next_slice} = Workspace.output(workspace, execution_id, slice.next_offset)
+{:ok, slice} = Host.output(workspace, execution_id, 0)
+{:ok, next_slice} = Host.output(workspace, execution_id, slice.next_offset)
 ```
 
 Each observer uses its own byte offset. The read returns the available
@@ -27,7 +27,7 @@ Use [the example stream](example.ex) to read slices until the controller
 settles the command. The stream waits briefly between empty reads.
 
 ```elixir
-alias Jido.Workspace.Examples.FollowOutput
+alias Jido.Realm.Host.Examples.FollowOutput
 
 workspace
 |> FollowOutput.follow(execution_id)
@@ -39,7 +39,7 @@ delivers them. The effective command output limit bounds its size. The
 returned `Execution.output` stores the first bytes within the same limit.
 Use the original run result to check the exit or stop outcome. A slice
 with `done?: true` means that the output record is final, including when
-Workspace could not confirm that writers stopped. The record is available
+Realm could not confirm that writers stopped. The record is available
 until the next admitted command or workspace close.
 
 ## Run the tests

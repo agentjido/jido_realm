@@ -1,4 +1,4 @@
-defmodule Jido.Workspace.TestSupport.ProcessBackend do
+defmodule Jido.Realm.Host.TestSupport.ProcessBackend do
   @moduledoc "Shell test backend that runs a real local process."
   @behaviour Jido.Shell.Backend
 

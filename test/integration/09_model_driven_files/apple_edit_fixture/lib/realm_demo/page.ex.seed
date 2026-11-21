@@ -1,0 +1,17 @@
+defmodule RealmDemo.Page do
+  use Phoenix.Controller, formats: [:html, :json]
+
+  def home(conn, _params) do
+    body = """
+    <!doctype html>
+    <html lang="en">
+    <head><meta charset="utf-8"><title>Jido Realm</title></head>
+    <body><main><h1>Hello, world!</h1></main></body>
+    </html>
+    """
+
+    conn
+    |> put_resp_content_type("text/html")
+    |> send_resp(200, body)
+  end
+end

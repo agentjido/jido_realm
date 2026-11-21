@@ -1,4 +1,4 @@
-defmodule Jido.Workspace.Examples.StoreS3Artifact do
+defmodule Jido.Realm.Host.Examples.StoreS3Artifact do
   @moduledoc false
 
   alias Jido.VFS

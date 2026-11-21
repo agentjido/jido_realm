@@ -1,11 +1,11 @@
-defmodule Jido.Workspace.Examples.ReportProvider do
+defmodule Jido.Realm.Host.Examples.ReportProvider do
   @moduledoc false
-  @behaviour Jido.Workspace.Provider
+  @behaviour Jido.Realm.Host.Provider
   use Agent
 
   alias Jido.VFS.Capture
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Provider, Schemas}
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Provider, Schemas}
 
   def start_link(_) do
     Agent.start_link(fn -> %{trees: %{}, revoked: MapSet.new(), retried: MapSet.new()} end)
@@ -53,14 +53,14 @@ defmodule Jido.Workspace.Examples.ReportProvider do
     if MapSet.member?(state.revoked, id) do
       {{:error, :closed}, state}
     else
-      {:ok, tree} = Workspace.open(owner: self())
+      {:ok, tree} = Host.open(owner: self())
 
       case restore(tree, capture) do
         :ok ->
           {:ok, put_in(state.trees[id], %{tree: tree, access: access})}
 
         error ->
-          Workspace.close(tree)
+          Host.close(tree)
           {error, state}
       end
     end
@@ -69,8 +69,8 @@ defmodule Jido.Workspace.Examples.ReportProvider do
   defp restore(_, nil), do: :ok
 
   defp restore(tree, capture) do
-    with {:ok, _, revision} <- Workspace.capture(tree),
-         {:ok, _} <- Workspace.replace(tree, capture, expected: revision),
+    with {:ok, _, revision} <- Host.capture(tree),
+         {:ok, _} <- Host.replace(tree, capture, expected: revision),
          do: :ok
   end
 
@@ -99,7 +99,7 @@ defmodule Jido.Workspace.Examples.ReportProvider do
         {:ok, state}
 
       {%{tree: tree}, remaining} ->
-        case Workspace.close(tree) do
+        case Host.close(tree) do
           :ok -> {:ok, %{state | trees: remaining}}
           {:error, _} -> {{:error, :cleanup_unconfirmed}, state}
         end
@@ -131,7 +131,7 @@ defmodule Jido.Workspace.Examples.ReportProvider do
   end
 
   defp file_request(%{tree: tree}, {:list, path, limit}) do
-    with {:ok, entries} <- Workspace.list(tree, absolute(path)) |> normalize() do
+    with {:ok, entries} <- Host.list(tree, absolute(path)) |> normalize() do
       if limit == :infinity or length(entries) <= limit,
         do: {:ok, Enum.map(entries, &%{&1 | path: String.trim_leading(&1.path, "/")})},
         else: {:error, :discovery_entry_limit}
@@ -140,16 +140,16 @@ defmodule Jido.Workspace.Examples.ReportProvider do
 
   defp file_request(%{tree: tree}, {:write, path, bytes, check}) do
     with :ok <- check_revision(tree, path, check) do
-      tree |> Workspace.write(absolute(path), bytes) |> normalize()
+      tree |> Host.write(absolute(path), bytes) |> normalize()
     end
   end
 
   defp file_request(%{tree: tree}, {:mkdir, path}) do
-    tree |> Workspace.mkdir(absolute(path)) |> normalize()
+    tree |> Host.mkdir(absolute(path)) |> normalize()
   end
 
   defp file_request(%{tree: tree}, {:check_write, path}) do
-    case Workspace.list(tree, absolute(Path.dirname(path))) do
+    case Host.list(tree, absolute(Path.dirname(path))) do
       {:ok, entries} ->
         if Enum.any?(entries, &(&1.kind == :directory and &1.path == absolute(path))),
           do: {:error, :is_directory},
@@ -170,7 +170,7 @@ defmodule Jido.Workspace.Examples.ReportProvider do
   defp check_revision(tree, path, {:revision, expected}),
     do: Provider.check_revision(read(tree, path), expected)
 
-  defp read(tree, path), do: tree |> Workspace.read(absolute(path)) |> normalize()
+  defp read(tree, path), do: tree |> Host.read(absolute(path)) |> normalize()
 
   @impl true
   def run(environment, %{argv: ["copy", source, destination]} = command) do
@@ -217,7 +217,7 @@ defmodule Jido.Workspace.Examples.ReportProvider do
   @impl true
   def capture(environment, budget) do
     with_tree(environment, fn %{tree: tree} ->
-      with {:ok, %Capture{entries: entries} = capture, _} <- Workspace.capture(tree),
+      with {:ok, %Capture{entries: entries} = capture, _} <- Host.capture(tree),
            true <- map_size(entries) <= budget.entries,
            true <- Enum.reduce(entries, 0, &add_size/2) <= budget.bytes do
         {:ok, capture}

@@ -1,0 +1,5 @@
+defmodule RealmDemo.Endpoint do
+  use Phoenix.Endpoint, otp_app: :realm_edit_demo
+
+  plug(RealmDemo.Router)
+end

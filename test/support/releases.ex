@@ -1,6 +1,6 @@
-defmodule Jido.Workspace.Deploy.Test.Releases do
+defmodule Jido.Realm.Host.Deploy.Test.Releases do
   @moduledoc false
-  alias Jido.Workspace.Deploy.{Artifact, Snapshot}
+  alias Jido.Realm.Host.Deploy.{Artifact, Snapshot}
 
   def build(root) do
     File.mkdir_p!(root)

@@ -1,4 +1,4 @@
-# Workspace example table of contents
+# Realm example table of contents
 
 **Status** All numbered examples in chapters 00 through 08 are runnable.
 
@@ -12,7 +12,7 @@ separate store.
 | Use case | Filesystem and storage role | Execution provider | Security to prove | Lifecycle to prove |
 | --- | --- | --- | --- | --- |
 | **Core · Scratch work** | Memory is the live tree. A store holds the saved result. | Virtual tools | Paths stay under the root. Tools use the same tree as file calls. | Open, edit, run, save, close, and restore. An old handle loses access. |
-| **Core · Isolated build** | A Workspace-owned local directory is the live tree. | Isolated native runtime | Literal argv and relative working directory work. A command cannot read a test fixture outside the allowed root. | Repeat the scratch workflow. A timeout leaves the tree blocked for writes and saves until the provider confirms that its writers stopped. Close cleans up disposable resources. |
+| **Core · Isolated build** | A Realm-owned local directory is the live tree. | Isolated native runtime | Literal argv and relative working directory work. A command cannot read a test fixture outside the allowed root. | Repeat the scratch workflow. A timeout leaves the tree blocked for writes and saves until the provider confirms that its writers stopped. Close cleans up disposable resources. |
 | **Core · Restricted access** | Use a prepared memory tree and repeat on the isolated directory. | Virtual tools and isolated native runtime | Permit reads. Refuse writes through file calls and commands that could write. Refuse a profile when the provider lacks a required control. | Failed admission leaves no usable handle or allocated resource. |
 | **Core · Restore after restart** | Save a portable tree to a host-configured directory store. | Save on memory. Reopen on memory or Docker. | Check the reference and content before returning a handle. | Refuse save while a writer is active. A fresh BEAM restores the saved tree. Damage to a later bundle leaves the earlier reference usable. |
 | Day-to-day editing | Memory, a disposable directory, or a host-owned checkout | Virtual tools or Docker | Confine file calls to the root and check stale edits. | Close preserves a host-owned directory. A surviving Docker writer blocks reopen. |
@@ -24,9 +24,9 @@ separate store.
 | Run a service | Owned tree and snapshot store | Docker command and loopback connector | Allow only profile-approved ports. Check disabled container networking and no host port bindings. | Check readiness, reconnect, stop the service, then save and restore the report. |
 | Add a provider | Provider-bound tree and portable capture | Host-supplied callback module | Check enforced tree access and required isolation. Refuse unsupported requests. | Revoke by lease ID on partial allocation, late provision, or controller loss. Confirm release on retry. |
 | Reuse or request a persistent machine | Dedicated working tree and durable infrastructure reference | Host-owned local Docker machine | Verify resource identity and refuse a second lease. | Keep the same machine and files after close. Open a fresh tree on a separate machine. |
-| Recover a command on a persistent machine | Dedicated tree and durable command reference | Host service and local Docker job | Require the recovery grant without granting a lease. Refuse a duplicate launch and fence writes after an unknown result. | Inspect, wait for, or stop a command after a lost reply or Workspace BEAM loss. |
+| Recover a command on a persistent machine | Dedicated tree and durable command reference | Host service and local Docker job | Require the recovery grant without granting a lease. Refuse a duplicate launch and fence writes after an unknown result. | Inspect, wait for, or stop a command after a lost reply or Realm BEAM loss. |
 | Replace a writer | Dedicated tree and portable snapshot | Host service and local Docker job | Refuse stale file, launch, and capture requests. | Revoke the old lease and confirm its writers stopped before admitting a replacement. Keep the lease through connection loss. |
-| Hand off to an external maintainer | Dedicated tree and portable snapshot | Host service and local Docker console | Use one writer slot. Refuse new console commands during return and confirm exit and removal. | Save from a replacement Workspace and restore the maintainer's review on memory. |
+| Hand off to an external maintainer | Dedicated tree and portable snapshot | Host service and local Docker console | Use one writer slot. Refuse new console commands during return and confirm exit and removal. | Save from a replacement Realm and restore the maintainer's review on memory. |
 | Keep the result of a scratch session | Memory to a directory store | Memory or Docker for review | Review the exact saved tree and check store permissions. | Keep the earlier result after a failed publication and retry the new save. |
 | Publish a reviewed report | Saved tree to a dedicated local Git branch | Memory or Docker for review, then host Git | Copy only the approved file as exact bytes. | Prepare a commit and update the branch only if its head still matches. Keep the newer head if publication is stale. |
 | Store a selected artifact in S3 | Saved tree to a digest key in an S3 bucket | Memory or Docker for review, then host S3 client | Keep credentials with the host. Check that the store denies access outside the allowed prefix. | Interrupt a PUT and lose a completed PUT reply. Retry with the same bytes and keep the earlier artifact readable. |
@@ -36,11 +36,11 @@ separate store.
 | Finish a job after client loss | Retained machine tree, portable snapshot, and local Git branch | Host-owned Docker job and memory review | Confirm command success and a settled lease. Verify saved report bytes before the branch update. | Resume observation in a fresh BEAM. Reattach for safe save, review, and publication. |
 
 The related guides and tests cover storage adapters, Docker isolation, and
-deployment. [VFS adapter guide](../docs/vfs/README.md) · [Docker tests](../test/examples/docker_sandbox_test.exs) · [Deploy guide](../DEPLOY.md)
+deployment. [VFS adapter guide](https://github.com/agentjido/jido_vfs) · [Docker tests](../test/examples/docker_sandbox_test.exs) · [Deploy guide](../DEPLOY.md)
 
 ## First examples
 
-These examples use the public Workspace API. [Core chapter](00_core/README.md)
+These examples use the Realm host API. [Core chapter](00_core/README.md)
 
 | Example | What the test checks today |
 | --- | --- |

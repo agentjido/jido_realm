@@ -1,22 +1,25 @@
-defmodule Jido.Workspace.MixProject do
+defmodule Jido.Realm.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @source_url "https://github.com/agentjido/jido_workspace"
-  @description "Unified artifact workspace for agent sessions (Jido.Shell + Jido.VFS)"
+  @source_url "https://github.com/agentjido/jido_realm"
+  @description "Working files, execution environments, and previews for Jido agents"
+  @shell_ref "d2666d11cd082345b7c2b11328cfc5f6c89c88d5"
+  @vfs_ref "d8e473ca68c6e230f9aac2e63b9da47cc5382c0d"
 
   def project do
     [
-      app: :jido_workspace,
+      app: :jido_realm,
       version: @version,
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
+      test_ignore_filters: [&integration_fixture?/1],
 
       # Documentation
-      name: "Jido.Workspace",
+      name: "Jido.Realm",
       description: @description,
       source_url: @source_url,
       homepage_url: @source_url,
@@ -33,7 +36,8 @@ defmodule Jido.Workspace.MixProject do
       dialyzer: [
         plt_local_path: "priv/plts/project.plt",
         plt_core_path: "priv/plts/core.plt",
-        plt_add_apps: [:mix]
+        plt_add_apps: [:mix],
+        ignore_warnings: ".dialyzer_ignore.exs"
       ]
     ]
   end
@@ -42,6 +46,7 @@ defmodule Jido.Workspace.MixProject do
     [
       preferred_envs: [
         "test.examples": :test,
+        "test.realm": :test,
         "test.coverage": :test,
         coveralls: :test,
         "coveralls.github": :test,
@@ -53,39 +58,39 @@ defmodule Jido.Workspace.MixProject do
 
   def application do
     [
-      extra_applications: [:logger, :crypto, :sasl, :ssh, :public_key],
-      mod: {Jido.Workspace.Application, []}
+      extra_applications: [:logger, :crypto, :sasl, :ssh, :public_key, :inets, :ssl],
+      mod: {Jido.Realm.Application, []}
     ]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
+  defp integration_fixture?(path) do
+    Path.basename(path) in [
+      "apple_edit_guest.exs",
+      "apple_edit_tools.exs",
+      "sprite_app_fixture.exs"
+    ]
+  end
+
   defp deps do
     [
       # Runtime
+      shell_dep(),
+      vfs_dep(),
       {:zoi, "~> 0.19.0"},
       {:splode, "~> 0.3.0"},
       {:jason, "~> 1.4"},
       {:telemetry, "~> 1.0"},
-      {:uniq, "~> 0.6"},
-      {:bash, "~> 0.6.0", optional: true},
-      {:erlexec, "~> 2.6", optional: true, runtime: false},
-      {:lua, "~> 1.0.0-rc.1"},
-      {:ex_aws, "~> 2.7"},
-      {:ex_aws_s3, "~> 2.2"},
-      {:sweet_xml, "~> 0.6"},
-      {:eternal, "~> 1.2.2"},
-      {:git_cli, "~> 0.3.0"},
-      {:req, "~> 0.6"},
-      {:igniter, "~> 0.7", optional: true},
-
-      # Agent boundary checks
-      {:jido,
-       github: "agentjido/jido",
-       ref: "047bf746330a2fbe7c3b25c045552e0303c97eaf",
-       only: :test,
-       runtime: false},
+      # Enable the optional Bash backend in Shell.
+      {:bash, "~> 0.6.0"},
+      {:erlexec, "~> 2.6.0"},
+      {:lua, "~> 1.0.2"},
+      {:jido, github: "agentjido/jido", ref: "aa61e26d50f8035dcffd9149515e60fcda9dcc6a"},
+      {:sprites, "~> 0.2.4"},
+      # Sprites 0.2.4 caps Cowlib at 2.19. Use the 2.22 security fixes.
+      {:cowlib, "~> 2.22.0", override: true},
 
       # Dev/Test
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -101,10 +106,25 @@ defmodule Jido.Workspace.MixProject do
     ]
   end
 
+  defp shell_dep do
+    case System.get_env("JIDO_SHELL_PATH") do
+      nil -> {:jido_shell, github: "agentjido/jido_shell", ref: @shell_ref}
+      path -> {:jido_shell, path: Path.expand(path)}
+    end
+  end
+
+  defp vfs_dep do
+    case System.get_env("JIDO_VFS_PATH") do
+      nil -> {:jido_vfs, github: "agentjido/jido_vfs", ref: @vfs_ref, override: true}
+      path -> {:jido_vfs, path: Path.expand(path)}
+    end
+  end
+
   defp aliases do
     [
       setup: ["deps.get", "git_hooks.install"],
       "test.examples": &examples/1,
+      "test.realm": &realm_examples/1,
       "test.integration": &integration/1,
       "test.coverage": &coverage/1,
       q: ["quality"],
@@ -112,7 +132,6 @@ defmodule Jido.Workspace.MixProject do
         "format --check-formatted",
         "compile --warnings-as-errors",
         "credo --strict",
-        "jido_shell.guardrails",
         "dialyzer",
         "doctor --raise"
       ]
@@ -127,15 +146,15 @@ defmodule Jido.Workspace.MixProject do
         "CONTRIBUTING.md",
         "LICENSE",
         "README.md",
+        "HOST.md",
+        "VISION.md",
         "config",
         "lib",
         "src",
         "API_SPEC.md",
         "SANDBOX.md",
         "DEPLOY.md",
-        "docs/shell",
-        "docs/vfs",
-        "docs/guides/table_of_contents.md",
+        "docs/guides",
         "docs/source-imports.md",
         "docs/workspace-asset-lifecycle.md",
         "mix.exs",
@@ -144,9 +163,9 @@ defmodule Jido.Workspace.MixProject do
       maintainers: ["Agent Jido Team"],
       licenses: ["Apache-2.0"],
       links: %{
-        "Changelog" => "https://hexdocs.pm/jido_workspace/changelog.html",
+        "Changelog" => "https://hexdocs.pm/jido_realm/changelog.html",
         "Discord" => "https://agentjido.xyz/discord",
-        "Documentation" => "https://hexdocs.pm/jido_workspace",
+        "Documentation" => "https://hexdocs.pm/jido_realm",
         "GitHub" => @source_url,
         "Website" => "https://agentjido.xyz"
       }
@@ -157,29 +176,28 @@ defmodule Jido.Workspace.MixProject do
     guide_groups = [
       "Start here": [
         {"docs/guides/table_of_contents.md", filename: "guides"},
-        {"README.md", title: "Open a workspace"}
+        {"README.md", title: "Jido Realm"},
+        {"HOST.md", title: "Realm host API"},
+        {"docs/guides/first-realm.md", title: "First Realm"},
+        {"docs/guides/files.md", title: "Realm files"},
+        {"docs/guides/exec.md", title: "Realm execution"},
+        {"docs/guides/services.md", title: "Realm services"},
+        {"docs/guides/artifacts.md", title: "Realm artifacts"},
+        {"docs/guides/providers.md", title: "Realm providers"}
       ],
       "Execution and delivery": [
         {"SANDBOX.md", title: "Run in a sandbox"},
         {"DEPLOY.md", title: "Deploy a saved result"}
       ],
-      "Shell and VFS": [
-        {"docs/shell/shell.md", title: "Shell sessions"},
-        {"docs/vfs/vfs.md", title: "Virtual filesystems"},
-        {"docs/vfs/jido-agent-integration.md", title: "Use VFS in Jido agents"}
-      ],
       Maintenance: [
         {"CONTRIBUTING.md", title: "Contributing"},
-        {"docs/vfs/adapter-onboarding-checklist.md", title: "VFS adapter checklist"},
-        {"docs/shell/GUARDRAILS.md", title: "Shell guardrails"},
-        {"docs/shell/MIGRATION.md", title: "Shell migration"},
         {"docs/source-imports.md", title: "Imported source"},
         {"CHANGELOG.md", title: "Change log"},
         {"LICENSE", title: "License"}
       ],
       "Earlier designs": [
-        {"API_SPEC.md", title: "Workspace API proposal"},
-        {"docs/workspace-asset-lifecycle.md", title: "Workspace asset lifecycle proposal"}
+        {"API_SPEC.md", title: "Realm host API proposal"},
+        {"docs/workspace-asset-lifecycle.md", title: "Realm asset lifecycle proposal"}
       ]
     ]
 
@@ -188,37 +206,32 @@ defmodule Jido.Workspace.MixProject do
       source_ref: "v#{@version}",
       extra_section: "Guides",
       groups_for_modules: [
-        Workspace: [
-          Jido.Workspace,
-          Jido.Workspace.Workspace,
-          Jido.Workspace.Entry,
-          Jido.Workspace.Error,
-          Jido.Workspace.Execution,
-          Jido.Workspace.FileView,
-          Jido.Workspace.Info
+        Host: [
+          Jido.Realm.Host,
+          Jido.Realm.Host.Handle,
+          Jido.Realm.Host.Entry,
+          Jido.Realm.Host.Error,
+          Jido.Realm.Host.Execution,
+          Jido.Realm.Host.FileView,
+          Jido.Realm.Host.Info
         ],
         "Durable references": [
-          Jido.Workspace.Snapshot,
-          Jido.Workspace.InfrastructureRef,
-          Jido.Workspace.CommandRef
+          Jido.Realm.Host.Snapshot,
+          Jido.Realm.Host.InfrastructureRef,
+          Jido.Realm.Host.CommandRef
         ],
         "Profiles and providers": [
-          Jido.Workspace.Profile,
-          Jido.Workspace.Policy,
-          Jido.Workspace.Provider,
-          Jido.Workspace.Schemas
+          Jido.Realm.Host.Profile,
+          Jido.Realm.Host.Policy,
+          Jido.Realm.Host.Provider,
+          Jido.Realm.Host.Schemas
         ],
-        Sandboxes: ~r/^Jido\.Workspace\.Sandbox(\.|$)/,
-        Deployment: ~r/^Jido\.Workspace\.Deploy(\.|$)/,
-        Shell: ~r/^Jido\.Shell(\.|$)/,
-        VFS: ~r/^Jido\.VFS(\.|$)/
+        Sandboxes: ~r/^Jido\.Realm\.Host\.Sandbox(\.|$)/,
+        Deployment: ~r/^Jido\.Realm\.Host\.Deploy(\.|$)/
       ],
       nest_modules_by_prefix: [
-        Jido.Workspace.Sandbox,
-        Jido.Workspace.Deploy,
-        Jido.Shell.Backend,
-        Jido.Shell.Command,
-        Jido.VFS.Adapter
+        Jido.Realm.Host.Sandbox,
+        Jido.Realm.Host.Deploy
       ],
       extras: Enum.flat_map(guide_groups, &elem(&1, 1)),
       groups_for_extras:
@@ -233,6 +246,16 @@ defmodule Jido.Workspace.MixProject do
       "test",
       numbered_example_files() ++ ["--include", "integration" | args]
     )
+  end
+
+  defp realm_examples(args) do
+    files =
+      Enum.flat_map(
+        ["examples/realm", "test/integration"],
+        &Path.wildcard(&1 <> "/**/*_test.exs")
+      )
+
+    Mix.Task.run("test", files ++ args)
   end
 
   defp integration(args) do
@@ -266,14 +289,6 @@ defmodule Jido.Workspace.MixProject do
       )
     end
 
-    vfs_examples =
-      Path.wildcard("test/jido_vfs/adapter/{ets,git,in_memory,local}_integration_test.exs")
-
-    coverage_run(
-      ["coveralls.json", "--include", "integration", "--export-coverage", "examples/vfs"] ++
-        vfs_examples ++ args
-    )
-
     coverage_run(["coveralls.json", "--import-cover", output] ++ args)
     coverage_run(["coveralls", "--import-cover", output] ++ args)
   end
@@ -292,5 +307,5 @@ defmodule Jido.Workspace.MixProject do
     numbered_example_files() ++ Path.wildcard("test/examples/**/*_test.exs")
   end
 
-  defp numbered_example_files, do: Path.wildcard("examples/**/*_test.exs")
+  defp numbered_example_files, do: Path.wildcard("examples/[0-9][0-9]_*/**/*_test.exs")
 end

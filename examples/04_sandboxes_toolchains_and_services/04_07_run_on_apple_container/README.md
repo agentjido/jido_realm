@@ -8,11 +8,11 @@ CLI, service, and image before it creates the workspace directory.
 [Apple Container setup](https://github.com/apple/container/tree/1.7.1#get-started)
 
 ```elixir
-config :jido_workspace,
+config :jido_realm,
   profiles: %{
     apple_review: %{
       provider: :apple_container,
-      image: "localhost/jido-workspace-apple-fixture:local",
+      image: "localhost/jido-realm-apple-fixture:local",
       policy: :full_access,
       store: "reports",
       tools: ["/bin/cp"],
@@ -29,44 +29,44 @@ directory is part of the workspace tree mounted at `/workspace`.
 [Example function](example.ex)
 
 ```elixir
-alias Jido.Workspace
-alias Jido.Workspace.Examples.AppleContainer
+alias Jido.Realm.Host
+alias Jido.Realm.Host.Examples.AppleContainer
 
-{:ok, workspace} = Workspace.open(profile: :apple_review)
+{:ok, workspace} = Host.open(profile: :apple_review)
 
 {:ok, snapshot} =
   try do
     AppleContainer.copy_and_save(workspace, "Reviewed report\n")
   after
-    :ok = Workspace.close(workspace)
+    :ok = Host.close(workspace)
   end
 
-{:ok, memory} = Workspace.open(profile: :review_in_memory, from: snapshot)
+{:ok, memory} = Host.open(profile: :review_in_memory, from: snapshot)
 
 try do
-  {:ok, "Reviewed report\n"} = Workspace.read(memory, "reports today/reviewed report.txt")
+  {:ok, "Reviewed report\n"} = Host.read(memory, "reports today/reviewed report.txt")
 after
-  :ok = Workspace.close(memory)
+  :ok = Host.close(memory)
 end
 ```
 
 Each command gets its own Linux VM with only loopback networking, a read-only
 root filesystem, and one workspace mount. The mount is read-only when the
-profile has execute permission without write permission. Workspace checks the
+profile has execute permission without write permission. Realm checks the
 container configuration before start. It checks the exact container ID in the
-list of all containers after a delete request. `Workspace.cancel/2` requests a
-stop. Wait for the `Workspace.run/3` result to confirm cancellation before you
-edit or save. If cleanup is uncertain, Workspace blocks edits and saves. Close
+list of all containers after a delete request. `Host.cancel/2` requests a
+stop. Wait for the `Host.run/3` result to confirm cancellation before you
+edit or save. If cleanup is uncertain, Realm blocks edits and saves. Close
 can be tried again to complete cleanup.
 
-Workspace enforces the execution timeout after launch and the retained output
+Realm enforces the execution timeout after launch and the retained output
 limit. The CLI requests one CPU and 256 MiB for VM sizing. Apple's overhead can
 raise the guest totals, so the profile reports no enforceable CPU, memory,
 process, or temporary file ceilings. Open refuses those `runtime_limits`
 requirements and `stdin: :pipe`. Use a disposable workspace directory.
-Apple Container profiles support file snapshots through `Workspace.save/1`.
+Apple Container profiles support file snapshots through `Host.save/1`.
 
-Workspace checks that the local image still has the same digest before each
+Realm checks that the local image still has the same digest before each
 create and verifies the digest before start. Keep the image in the local store
 while the profile is in use. Apple Container 1.7.1 can fetch content during
 create if local content goes away. The CLI has no local-only create option.
@@ -86,9 +86,9 @@ JIDO_SANDBOX_APPLE=1 mix test \
 ```
 
 Before you run the profile above yourself, tag the local image with
-`container image tag alpine:latest localhost/jido-workspace-apple-fixture:local`.
+`container image tag alpine:latest localhost/jido-realm-apple-fixture:local`.
 
 The tests check literal arguments, file restore on memory, cancellation, timeout,
 exact container removal, read-only mounts, loopback, and output truncation.
 Run the simulated host and cleanup failures on any supported Elixir host with
-`mix test test/jido_workspace/apple_container_test.exs`.
+`mix test test/jido_realm/host/apple_container_test.exs`.

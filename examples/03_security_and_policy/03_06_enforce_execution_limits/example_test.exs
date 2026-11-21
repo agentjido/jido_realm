@@ -1,13 +1,13 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 
-defmodule Jido.Workspace.Examples.ExecutionLimitsTest do
+defmodule Jido.Realm.Host.Examples.ExecutionLimitsTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution}
-  import Jido.Workspace.Examples.LifecycleSupport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution}
+  import Jido.Realm.Host.Examples.LifecycleSupport
 
   @command_limits %{timeout_ms: 4_000, output_limit: 128}
   @runtime_limits %{
@@ -33,7 +33,7 @@ defmodule Jido.Workspace.Examples.ExecutionLimitsTest do
               %{
                 command_limits: @command_limits,
                 capabilities: %{provider: :memory, runtime_limits: %{} = limits}
-              }} = Workspace.info(workspace)
+              }} = Host.info(workspace)
 
       assert limits == %{}
       check_output_cap(workspace)
@@ -49,7 +49,7 @@ defmodule Jido.Workspace.Examples.ExecutionLimitsTest do
               operation: :open,
               code: :unsupported_capability,
               details: %{capability: :runtime_limits}
-            }} = Workspace.open(profile: :memory)
+            }} = Host.open(profile: :memory)
   end
 
   if System.get_env("JIDO_SANDBOX_DOCKER") != "1" do
@@ -62,7 +62,7 @@ defmodule Jido.Workspace.Examples.ExecutionLimitsTest do
               %{
                 command_limits: @command_limits,
                 capabilities: %{provider: :docker, runtime_limits: @runtime_limits}
-              }} = Workspace.info(workspace)
+              }} = Host.info(workspace)
 
       check_output_cap(workspace)
       check_cgroup(workspace)
@@ -95,13 +95,13 @@ defmodule Jido.Workspace.Examples.ExecutionLimitsTest do
               operation: :open,
               code: :unsupported_capability,
               details: %{capability: :runtime_limits}
-            }} = Workspace.open(profile: :docker)
+            }} = Host.open(profile: :docker)
 
     configure_profile(:docker, require: %{runtime_limits: %{pids: @runtime_limits.pids + 1}})
 
     with_workspace(:docker, fn workspace ->
-      assert {:ok, %{capabilities: %{runtime_limits: %{pids: 256}}}} = Workspace.info(workspace)
-      assert :ok = Workspace.write(workspace, "report.txt", "Accepted")
+      assert {:ok, %{capabilities: %{runtime_limits: %{pids: 256}}}} = Host.info(workspace)
+      assert :ok = Host.write(workspace, "report.txt", "Accepted")
     end)
 
     assert File.read!(Path.join(checkout, "report.txt")) == "Accepted"
@@ -118,12 +118,12 @@ defmodule Jido.Workspace.Examples.ExecutionLimitsTest do
 
     assert {:error,
             %Error{code: :unsupported_capability, details: %{capability: :runtime_limits}}} =
-             Workspace.open(profile: :docker)
+             Host.open(profile: :docker)
 
     configure_profile(:docker, require: %{runtime_limits: Map.delete(@runtime_limits, :pids)})
 
     with_workspace(:docker, fn workspace ->
-      assert {:ok, %{capabilities: %{runtime_limits: limits}}} = Workspace.info(workspace)
+      assert {:ok, %{capabilities: %{runtime_limits: limits}}} = Host.info(workspace)
       assert limits == Map.delete(@runtime_limits, :pids)
     end)
   end
@@ -131,22 +131,22 @@ defmodule Jido.Workspace.Examples.ExecutionLimitsTest do
   defp check_output_cap(workspace) do
     bytes = String.duplicate("report\n", 64)
     cap = binary_part(bytes, 0, @command_limits.output_limit)
-    assert :ok = Workspace.write(workspace, "report.txt", bytes)
+    assert :ok = Host.write(workspace, "report.txt", bytes)
 
     assert {:ok, %Execution{status: :exited, exit_status: 0, output: ^cap, truncated: true}} =
-             Workspace.run(workspace, ["cat", "report.txt"], output_limit: 1_024)
+             Host.run(workspace, ["cat", "report.txt"], output_limit: 1_024)
 
     assert {:ok, %Execution{exit_status: 0, output: "report", truncated: true}} =
-             Workspace.run(workspace, ["cat", "report.txt"], output_limit: 6)
+             Host.run(workspace, ["cat", "report.txt"], output_limit: 6)
   end
 
   defp check_deadline(workspace, argv, opts, prefix) do
-    task = Task.async(fn -> Workspace.run(workspace, argv, [timeout_ms: 30_000] ++ opts) end)
+    task = Task.async(fn -> Host.run(workspace, argv, [timeout_ms: 30_000] ++ opts) end)
 
     id =
       await(
         fn ->
-          case Workspace.info(workspace) do
+          case Host.info(workspace) do
             {:ok, %{active_execution_id: id}} -> id
             _ -> nil
           end
@@ -156,7 +156,7 @@ defmodule Jido.Workspace.Examples.ExecutionLimitsTest do
 
     await(
       fn ->
-        case Workspace.output(workspace, id) do
+        case Host.output(workspace, id) do
           {:ok, %{bytes: bytes, done?: false}} -> String.starts_with?(bytes, prefix)
           _ -> false
         end
@@ -165,21 +165,21 @@ defmodule Jido.Workspace.Examples.ExecutionLimitsTest do
       3_500
     )
 
-    assert {:error, %Error{code: :busy}} = Workspace.save(workspace)
+    assert {:error, %Error{code: :busy}} = Host.save(workspace)
 
     assert {:ok, %Execution{id: ^id, status: :timed_out, exit_status: nil, output: bytes}} =
              Task.await(task, 10_000)
 
     assert String.starts_with?(bytes, prefix)
-    assert :ok = Workspace.write(workspace, "review.txt", "Stopped")
-    assert {:ok, %{kind: "snapshot"}} = Workspace.save(workspace)
+    assert :ok = Host.write(workspace, "review.txt", "Stopped")
+    assert {:ok, %{kind: "snapshot"}} = Host.save(workspace)
   end
 
   defp check_cgroup(workspace) do
     files = for name <- ~w(pids.max memory.max cpu.max), do: "/sys/fs/cgroup/" <> name
 
     assert {:ok, %Execution{exit_status: 0, output: output, truncated: false}} =
-             Workspace.run(workspace, ["cat" | files])
+             Host.run(workspace, ["cat" | files])
 
     assert [pids, memory, quota, period] = String.split(output)
     assert String.to_integer(pids) == @runtime_limits.pids
@@ -202,16 +202,16 @@ defmodule Jido.Workspace.Examples.ExecutionLimitsTest do
     """
 
     assert {:ok, %Execution{exit_status: 0, output: output, truncated: false}} =
-             Workspace.run(workspace, ["sh", "-c", script])
+             Host.run(workspace, ["sh", "-c", script])
 
     assert output |> String.trim() |> String.to_integer() == @runtime_limits.tmp_bytes
 
     assert {:ok, %Execution{exit_status: 0}} =
-             Workspace.run(workspace, ["sh", "-c", "test ! -e /tmp/probe"])
+             Host.run(workspace, ["sh", "-c", "test ! -e /tmp/probe"])
   end
 
   defp configure_profile(name, changes) do
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
 
     profiles =
       Map.update!(profiles, name, fn profile ->
@@ -221,7 +221,7 @@ defmodule Jido.Workspace.Examples.ExecutionLimitsTest do
         end)
       end)
 
-    Application.put_env(:jido_workspace, :profiles, profiles)
+    Application.put_env(:jido_realm, :profiles, profiles)
   end
 
   defp hide_pid_controller(root) do
@@ -253,7 +253,7 @@ defmodule Jido.Workspace.Examples.ExecutionLimitsTest do
   end
 
   defp with_workspace(profile, fun) do
-    assert {:ok, workspace} = Workspace.open(profile: profile)
+    assert {:ok, workspace} = Host.open(profile: profile)
 
     if profile == :docker do
       {_controller, sandbox} = provider(workspace, :native)
@@ -263,7 +263,7 @@ defmodule Jido.Workspace.Examples.ExecutionLimitsTest do
     try do
       fun.(workspace)
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 end

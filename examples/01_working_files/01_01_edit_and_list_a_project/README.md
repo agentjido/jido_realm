@@ -4,21 +4,21 @@ Use the same file calls on memory and Docker. Start with a named profile
 and use paths relative to the workspace root.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
-{:ok, workspace} = Workspace.open(profile: :memory)
-:ok = Workspace.mkdir(workspace, "project/inbox")
-:ok = Workspace.mkdir(workspace, "project/review")
-:ok = Workspace.write(workspace, "project/inbox/draft.txt", "Draft for review\n")
-:ok = Workspace.move(workspace, "project/inbox/draft.txt", "project/review/draft.txt")
-:ok = Workspace.delete(workspace, "project/inbox")
+{:ok, workspace} = Host.open(profile: :memory)
+:ok = Host.mkdir(workspace, "project/inbox")
+:ok = Host.mkdir(workspace, "project/review")
+:ok = Host.write(workspace, "project/inbox/draft.txt", "Draft for review\n")
+:ok = Host.move(workspace, "project/inbox/draft.txt", "project/review/draft.txt")
+:ok = Host.delete(workspace, "project/inbox")
 
-{:ok, "Draft for review\n"} = Workspace.read(workspace, "project/review/draft.txt")
-{:ok, [%Workspace.Entry{path: "project/review/draft.txt", kind: :file}]} =
-  Workspace.list(workspace, "project/review")
+{:ok, "Draft for review\n"} = Host.read(workspace, "project/review/draft.txt")
+{:ok, [%Host.Entry{path: "project/review/draft.txt", kind: :file}]} =
+  Host.list(workspace, "project/review")
 
-{:ok, snapshot} = Workspace.save(workspace)
-:ok = Workspace.close(workspace)
+{:ok, snapshot} = Host.save(workspace)
+:ok = Host.close(workspace)
 ```
 
 [EditProject](example.ex) runs the same edits and returns the draft and
@@ -56,7 +56,7 @@ links and uses the supplied name for a hard link. [Tests](example_test.exs)
 ## API fit and gaps
 
 The controller serializes file operations and checks write permission
-before a move. On Docker, Workspace checks the destination and uses a
+before a move. On Docker, Realm checks the destination and uses a
 native rename within the owned tree. This guarantee depends on control
 of the tree's writers. A process that edits the directory directly on
 the host bypasses the controller.

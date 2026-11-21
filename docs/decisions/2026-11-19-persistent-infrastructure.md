@@ -6,20 +6,18 @@ last-reviewed: 2026-11-19
 
 # Persistent infrastructure and writer ownership
 
-This boundary governs future Workspace provider designs. The project owner
+This boundary governs Realm provider designs. The project owner
 accepted the boundary in the infrastructure design interview on 2026-11-19.
-The [base design plan](../plans/2026-11-19-0740-workspace-base-design-plan.md)
-still requires approval.
 
 ## Separate lifetimes
 
 | Value | Responsibility |
 | --- | --- |
 | Infrastructure reference | The host keeps a durable provider and resource ID. It can reconnect to the same machine, with the files and installed dependencies that the provider preserves. The host can also request a fresh machine when the provider supports it. |
-| Workspace session | Workspace grants access to one managed tree on that resource. Close releases the session. The infrastructure lifecycle has separate operations for stop, retain, and destroy. |
+| Realm session | Realm grants access to one managed tree on that resource. Close releases the session. The infrastructure lifecycle has separate operations for stop, retain, and destroy. |
 | Snapshot reference | An explicit save of the managed tree. The host can use it for recovery, handoff, or restoring files onto a fresh resource. It has its own retention policy. |
 
-Preserve persistent infrastructure when the Workspace session closes or the
+Preserve persistent infrastructure when the Realm session closes or the
 BEAM stops. The developer controls the disposition of the machine and of
 commands that can still be running. The host selects the provider and owns
 credentials, placement, and fleet policy.
@@ -50,7 +48,7 @@ start. Expose provider-specific diagnostics when the common hooks lack
 detail. Diagnostic access conveys no authority to grant a writer.
 
 An external editor, SSH shell, or provider console that can change the tree
-also counts as a writer. Any such writer must be accounted for before Workspace
+also counts as a writer. Any such writer must be accounted for before Realm
 can claim exclusive control. An explicit maintenance handoff is a candidate
 for how to do this. Its API, provider recovery callbacks, and first remote
 provider remain open design questions.

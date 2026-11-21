@@ -1,8 +1,8 @@
-defmodule Jido.Workspace.BoundariesTest do
+defmodule Jido.Realm.Host.BoundariesTest do
   use ExUnit.Case, async: false
-  alias Jido.Workspace
-  alias Jido.Workspace.{Deploy, Sandbox}
-  alias Jido.Workspace.Deploy.{Artifact, Snapshot}
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Deploy, Sandbox}
+  alias Jido.Realm.Host.Deploy.{Artifact, Snapshot}
 
   test "path aliases and concurrent connects use one deployment controller" do
     {:ok, sandbox} = Sandbox.open()
@@ -62,25 +62,25 @@ defmodule Jido.Workspace.BoundariesTest do
   end
 
   test "Workspace commands record the observed view and reject stale revisions" do
-    {:ok, workspace} = Workspace.open()
-    on_exit(fn -> Workspace.close(workspace) end)
-    :ok = Workspace.write(workspace, "/input", "one")
-    {:ok, view} = Workspace.file_view(workspace)
+    {:ok, workspace} = Host.open()
+    on_exit(fn -> Host.close(workspace) end)
+    :ok = Host.write(workspace, "/input", "one")
+    {:ok, view} = Host.file_view(workspace)
     assert view.kind == :workspace
 
     assert {:ok, %{output: "one", files: ^view}} =
-             Workspace.run(workspace, "cat /input", files: view)
+             Host.run(workspace, "cat /input", files: view)
 
-    :ok = Workspace.write(workspace, "/input", "two")
+    :ok = Host.write(workspace, "/input", "two")
 
-    assert {:error, %Jido.Workspace.Error{code: :stale_file_view}} =
-             Workspace.run(workspace, "write /marker bad", files: view)
+    assert {:error, %Jido.Realm.Host.Error{code: :stale_file_view}} =
+             Host.run(workspace, "write /marker bad", files: view)
 
-    assert {:error, %Jido.Workspace.Error{code: :not_found}} =
-             Workspace.read(workspace, "/marker")
+    assert {:error, %Jido.Realm.Host.Error{code: :not_found}} =
+             Host.read(workspace, "/marker")
 
-    {:ok, before} = Workspace.file_view(workspace)
-    {:ok, next} = Workspace.run(workspace, "write /input three", files: before)
+    {:ok, before} = Host.file_view(workspace)
+    {:ok, next} = Host.run(workspace, "write /input three", files: before)
     assert next.files == before
     after_view = next.after_files
     refute after_view.revision == before.revision
@@ -89,32 +89,32 @@ defmodule Jido.Workspace.BoundariesTest do
   @tag :tmp_dir
   test "adapters without a revision report that limit and refuse a pinned view", %{tmp_dir: root} do
     {:ok, workspace} =
-      Workspace.open(adapter: Jido.VFS.Adapter.Local, adapter_opts: [prefix: root])
+      Host.open(adapter: Jido.VFS.Adapter.Local, adapter_opts: [prefix: root])
 
-    on_exit(fn -> Workspace.close(workspace) end)
-    {:ok, view} = Workspace.file_view(workspace)
+    on_exit(fn -> Host.close(workspace) end)
+    {:ok, view} = Host.file_view(workspace)
     assert view.revision == :unavailable
 
-    assert {:error, %Jido.Workspace.Error{code: :unversioned_file_view}} =
-             Workspace.run(workspace, "pwd", files: view)
+    assert {:error, %Jido.Realm.Host.Error{code: :unversioned_file_view}} =
+             Host.run(workspace, "pwd", files: view)
 
-    assert {:ok, %{files: ^view}} = Workspace.run(workspace, "pwd", files: :current)
+    assert {:ok, %{files: ^view}} = Host.run(workspace, "pwd", files: :current)
   end
 
   test "Workspace and Sandbox revisions cannot be substituted" do
-    {:ok, workspace} = Workspace.open()
+    {:ok, workspace} = Host.open()
     {:ok, sandbox} = Sandbox.open()
 
     on_exit(fn ->
-      Workspace.close(workspace)
+      Host.close(workspace)
       Sandbox.destroy(sandbox)
     end)
 
-    {:ok, view} = Workspace.file_view(workspace)
+    {:ok, view} = Host.file_view(workspace)
     assert {:error, :stale_file_view} = Sandbox.exec(sandbox, "/bin/echo", ["bad"], files: view)
     {:ok, view} = Sandbox.file_view(sandbox)
 
-    assert {:error, %Jido.Workspace.Error{code: :stale_file_view}} =
-             Workspace.run(workspace, "pwd", files: view)
+    assert {:error, %Jido.Realm.Host.Error{code: :stale_file_view}} =
+             Host.run(workspace, "pwd", files: view)
   end
 end

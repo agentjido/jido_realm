@@ -4,19 +4,19 @@ Search a project for a text marker, then read a match for review. The
 same calls work on memory and Docker.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
-{:ok, workspace} = Workspace.open(profile: :review, from: snapshot)
+{:ok, workspace} = Host.open(profile: :review, from: snapshot)
 
 try do
-  {:ok, matches} = Workspace.find(workspace, "src", contains: "release [draft]")
+  {:ok, matches} = Host.find(workspace, "src", contains: "release [draft]")
 
   for entry <- matches do
-    {:ok, bytes, revision} = Workspace.read(workspace, entry.path, revision: true)
+    {:ok, bytes, revision} = Host.read(workspace, entry.path, revision: true)
     %{path: entry.path, bytes: bytes, revision: revision}
   end
 after
-  :ok = Workspace.close(workspace)
+  :ok = Host.close(workspace)
 end
 ```
 
@@ -33,7 +33,7 @@ restores a saved project.
 }
 ```
 
-Use `Workspace.find(workspace)` to list regular files in the whole tree.
+Use `Host.find(workspace)` to list regular files in the whole tree.
 With `contains:`, the search matches literal bytes and returns the
 matching entries in path order. Use the entry path with `read/3` to
 inspect the file and get a revision for a later edit.
@@ -54,7 +54,7 @@ direct file access. A search returns `:discovery_limit` when it reaches a
 limit before it can finish. Narrow the search to a directory before retrying.
 Docker reads the names of one directory at a time before it checks the
 entry limit for that directory. It skips symbolic links and special files.
-The host coordinates any processes that edit a checkout outside Workspace.
+The host coordinates any processes that edit a checkout outside Realm.
 
 The workspace returns `:busy` for other file operations while a search
 is active. A later read uses the file at the time of that read. Use its

@@ -1,15 +1,15 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.RootedReportTest do
+defmodule Jido.Realm.Host.Examples.RootedReportTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Entry, Error, Execution}
-  alias Jido.Workspace.Examples.RootedReport
-  import Jido.Workspace.Examples.LifecycleSupport, only: [configure: 1]
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Entry, Error, Execution}
+  alias Jido.Realm.Host.Examples.RootedReport
+  import Jido.Realm.Host.Examples.LifecycleSupport, only: [configure: 1]
 
   @report_path "reports/-report.txt"
   @report "Workspace report\n"
@@ -42,61 +42,61 @@ defmodule Jido.Workspace.Examples.RootedReportTest do
 
     snapshot =
       with_workspace(:checkout, [], fn workspace ->
-        assert_denied(Workspace.read(workspace, "linked-file.txt"), :read, :symlink_path)
+        assert_denied(Host.read(workspace, "linked-file.txt"), :read, :symlink_path)
 
         assert_denied(
-          Workspace.read_chunk(workspace, "linked-file.txt", 0, 64),
+          Host.read_chunk(workspace, "linked-file.txt", 0, 64),
           :read_chunk,
           :symlink_path
         )
 
         assert_denied(
-          Workspace.read(workspace, "linked-directory/fixture.txt"),
+          Host.read(workspace, "linked-directory/fixture.txt"),
           :read,
           :symlink_path
         )
 
         assert_denied(
-          Workspace.write(workspace, "linked-file.txt", "Rejected"),
+          Host.write(workspace, "linked-file.txt", "Rejected"),
           :write,
           :symlink_path
         )
 
-        assert_denied(Workspace.mkdir(workspace, "linked-directory/new"), :mkdir, :symlink_path)
-        assert_denied(Workspace.delete(workspace, "linked-file.txt"), :delete, :symlink_path)
+        assert_denied(Host.mkdir(workspace, "linked-directory/new"), :mkdir, :symlink_path)
+        assert_denied(Host.delete(workspace, "linked-file.txt"), :delete, :symlink_path)
 
         source = Stream.map([@report], fn _ -> flunk("The rejected write read its source") end)
 
         assert_denied(
-          Workspace.write_stream(workspace, "linked-file.txt", source),
+          Host.write_stream(workspace, "linked-file.txt", source),
           :write_stream,
           :symlink_path
         )
 
         assert_denied(
-          Workspace.run(workspace, ["pwd"], cwd: "linked-directory"),
+          Host.run(workspace, ["pwd"], cwd: "linked-directory"),
           :run,
           :symlink_path
         )
 
-        assert_denied(Workspace.list(workspace), :list, :unsupported_capability)
-        assert_denied(Workspace.save(workspace), :save, :unsupported_capability)
+        assert_denied(Host.list(workspace), :list, :unsupported_capability)
+        assert_denied(Host.save(workspace), :save, :unsupported_capability)
 
-        assert {:ok, []} = Workspace.find(workspace, ".", contains: @outside)
+        assert {:ok, []} = Host.find(workspace, ".", contains: @outside)
 
         for link <- ["linked-file.txt", "linked-directory/fixture.txt"] do
           assert {:ok, %Execution{status: :exited, exit_status: code, output: output}} =
-                   Workspace.run(workspace, ["cat", link])
+                   Host.run(workspace, ["cat", link])
 
           assert code > 0
           refute output =~ @outside
         end
 
         assert {:ok, %Execution{exit_status: 0}} =
-                 Workspace.run(workspace, ["rm", "linked-file.txt", "linked-directory"])
+                 Host.run(workspace, ["rm", "linked-file.txt", "linked-directory"])
 
-        assert :ok = Workspace.write(workspace, @report_path, @report)
-        assert {:ok, snapshot} = Workspace.save(workspace)
+        assert :ok = Host.write(workspace, @report_path, @report)
+        assert {:ok, snapshot} = Host.save(workspace)
         snapshot
       end)
 
@@ -104,7 +104,7 @@ defmodule Jido.Workspace.Examples.RootedReportTest do
     refute File.exists?(Path.join(Path.dirname(outside), "new"))
 
     with_workspace(:memory, [from: snapshot], fn workspace ->
-      assert {:ok, @report} = Workspace.read(workspace, @report_path)
+      assert {:ok, @report} = Host.read(workspace, @report_path)
     end)
   end
 
@@ -121,18 +121,18 @@ defmodule Jido.Workspace.Examples.RootedReportTest do
     end
 
     with_workspace(:checkout, [], fn workspace ->
-      assert {:ok, @outside} = Workspace.read(workspace, "edit.txt")
-      assert :ok = Workspace.write(workspace, "edit.txt", @report)
-      assert {:ok, @report} = Workspace.read(workspace, "edit.txt")
-      assert {:ok, @outside} = Workspace.read(workspace, "keep.txt")
+      assert {:ok, @outside} = Host.read(workspace, "edit.txt")
+      assert :ok = Host.write(workspace, "edit.txt", @report)
+      assert {:ok, @report} = Host.read(workspace, "edit.txt")
+      assert {:ok, @outside} = Host.read(workspace, "keep.txt")
       assert File.read!(outside) == @outside
 
-      assert :ok = Workspace.delete(workspace, "remove.txt")
-      assert_denied(Workspace.read(workspace, "remove.txt"), :read, :not_found)
-      assert {:ok, @outside} = Workspace.read(workspace, "keep.txt")
+      assert :ok = Host.delete(workspace, "remove.txt")
+      assert_denied(Host.read(workspace, "remove.txt"), :read, :not_found)
+      assert {:ok, @outside} = Host.read(workspace, "keep.txt")
 
       assert {:ok, [%Entry{path: "edit.txt", mode: :executable}, %Entry{path: "keep.txt"}]} =
-               Workspace.list(workspace)
+               Host.list(workspace)
     end)
 
     assert File.read!(outside) == @outside
@@ -143,7 +143,7 @@ defmodule Jido.Workspace.Examples.RootedReportTest do
     File.write!(outside, @outside)
 
     with_workspace(profile, [], fn workspace ->
-      assert :ok = Workspace.write(workspace, @report_path, @report)
+      assert :ok = Host.write(workspace, @report_path, @report)
 
       for path <- [
             outside,
@@ -153,10 +153,10 @@ defmodule Jido.Workspace.Examples.RootedReportTest do
             "reports\\-report.txt",
             "C:fixture.txt"
           ] do
-        assert_denied(Workspace.read(workspace, path), :read, :invalid_input)
-        assert_denied(Workspace.write(workspace, path, "Rejected"), :write, :invalid_input)
-        assert_denied(Workspace.move(workspace, @report_path, path), :move, :invalid_input)
-        assert_denied(Workspace.run(workspace, ["pwd"], cwd: path), :run, :invalid_input)
+        assert_denied(Host.read(workspace, path), :read, :invalid_input)
+        assert_denied(Host.write(workspace, path, "Rejected"), :write, :invalid_input)
+        assert_denied(Host.move(workspace, @report_path, path), :move, :invalid_input)
+        assert_denied(Host.run(workspace, ["pwd"], cwd: path), :run, :invalid_input)
       end
 
       assert {:ok, %{report: @report, execution: %Execution{exit_status: 0, output: @report}}} =
@@ -173,11 +173,11 @@ defmodule Jido.Workspace.Examples.RootedReportTest do
     File.mkdir!(Path.dirname(outside))
     File.write!(outside, @outside)
 
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
     checkout_profile = Map.put(profiles.docker, :checkout, checkout)
 
     Application.put_env(
-      :jido_workspace,
+      :jido_realm,
       :profiles,
       Map.put(profiles, :checkout, checkout_profile)
     )
@@ -190,12 +190,12 @@ defmodule Jido.Workspace.Examples.RootedReportTest do
   end
 
   defp with_workspace(name, opts, fun) do
-    assert {:ok, workspace} = Workspace.open([profile: name] ++ opts)
+    assert {:ok, workspace} = Host.open([profile: name] ++ opts)
 
     try do
       fun.(workspace)
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 end

@@ -16,24 +16,24 @@ functions to find and revoke the exact lease. Choose whether to wait
 for each old command or stop it. In this example the host chooses to stop.
 
 ```elixir
-alias Jido.Workspace
-alias Jido.Workspace.Examples.RecoveryHost
+alias Jido.Realm.Host
+alias Jido.Realm.Host.Examples.RecoveryHost
 
 {:ok, old_id} = RecoveryHost.current_writer(host, machine)
 {:error, :cleanup_unconfirmed} = RecoveryHost.revoke_writer(host, machine, old_id)
-{:ok, %{status: :running}} = Workspace.recover_command(:recovery, command, :inspect)
+{:ok, %{status: :running}} = Host.recover_command(:recovery, command, :inspect)
 
-{:ok, %{status: :exited}} = Workspace.recover_command(:recovery, command, :stop)
+{:ok, %{status: :exited}} = Host.recover_command(:recovery, command, :stop)
 :ok = RecoveryHost.revoke_writer(host, machine, old_id)
 
-{:ok, workspace} = Workspace.open(profile: :run, infrastructure: machine)
+{:ok, workspace} = Host.open(profile: :run, infrastructure: machine)
 
 try do
-  :ok = Workspace.write(workspace, "review.txt", "Ready\n")
-  {:ok, snapshot} = Workspace.save(workspace)
+  :ok = Host.write(workspace, "review.txt", "Ready\n")
+  {:ok, snapshot} = Host.save(workspace)
   snapshot
 after
-  :ok = Workspace.close(workspace)
+  :ok = Host.close(workspace)
 end
 ```
 
@@ -43,21 +43,21 @@ lease's commands and releases only that lease. A lost or repeated
 release for the old lease cannot release the replacement.
 
 If the provider connection fails, recovery reports `:quiescence_unknown`.
-An open can report `:cleanup_unconfirmed` if Workspace also cannot verify
+An open can report `:cleanup_unconfirmed` if Realm also cannot verify
 release of its attempted lease. Restore the connection and inspect the
 same command reference. A live provider that still holds the old lease
 refuses a second open with `:infrastructure_busy`.
 
 ## API fit and gaps
 
-- `Workspace.open/1` gets the writer lease through the configured provider.
+- `Host.open/1` gets the writer lease through the configured provider.
   The provider checks the lease when it admits file edits, commands, or
   captures. These checks run in the same service that revokes leases.
 - If an old BEAM uses a revoked handle, the provider returns
-  `:lease_revoked`. Workspace records that phase and refuses more work on
+  `:lease_revoked`. Realm records that phase and refuses more work on
   the handle. `info/1` and `close/1` still work for diagnosis and release.
 - The provider's host API decides when to revoke a lease after a node or
-  connection fails. The common Workspace API handles the work and the
+  connection fails. The common Realm API handles the work and the
   recovery reference. A snapshot records the captured tree separately.
 
 The fixture uses a dedicated machine container and one isolated job

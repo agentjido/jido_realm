@@ -15,28 +15,28 @@ The host assigns the profiles. Start with an existing `snapshot` from the
 [examples guide](../../README.md#save-and-reopen-after-a-beam-restart).
 
 ```elixir
-alias Jido.Workspace
-alias Jido.Workspace.Snapshot
+alias Jido.Realm.Host
+alias Jido.Realm.Host.Snapshot
 
 {:ok, snapshot} = Snapshot.parse(snapshot)
 runner = %{provider: :memory, store: "reports"}
 
-Application.put_env(:jido_workspace, :profiles, %{
+Application.put_env(:jido_realm, :profiles, %{
   editor: Map.put(runner, :policy, [:import, :read, :write]),
   inspector: Map.put(runner, :policy, [:import, :read, :execute]),
   builder: Map.put(runner, :policy, [:import, :read, :write, :execute]),
   publisher: Map.put(runner, :policy, [:import, :read, :save])
 })
 
-{:ok, workspace} = Workspace.open(profile: :inspector, from: snapshot)
-{:ok, %{exit_status: 0, output: report}} = Workspace.run(workspace, ["cat", "report.txt"])
-{:error, %Workspace.Error{code: :policy_denied, details: %{action: :write}}} =
-  Workspace.write(workspace, "report.txt", "An edit")
-:ok = Workspace.close(workspace)
+{:ok, workspace} = Host.open(profile: :inspector, from: snapshot)
+{:ok, %{exit_status: 0, output: report}} = Host.run(workspace, ["cat", "report.txt"])
+{:error, %Host.Error{code: :policy_denied, details: %{action: :write}}} =
+  Host.write(workspace, "report.txt", "An edit")
+:ok = Host.close(workspace)
 
-{:ok, workspace} = Workspace.open(profile: :publisher, from: snapshot)
-{:ok, ^snapshot} = Workspace.save(workspace)
-:ok = Workspace.close(workspace)
+{:ok, workspace} = Host.open(profile: :publisher, from: snapshot)
+{:ok, ^snapshot} = Host.save(workspace)
+:ok = Host.close(workspace)
 ```
 
 Use `%{provider: :docker, image: "alpine:3.20", store: "reports"}` for
@@ -47,7 +47,7 @@ Execution requires `:read`. If `:write` is absent, the memory runner
 refuses virtual tools that can edit files. Docker starts the command with
 a read-only mount of the tree and excludes submounts. A Docker command
 that tries to write the mounted tree can return an execution with a nonzero
-exit status. A Workspace permission check returns a `:policy_denied` error
+exit status. A Realm permission check returns a `:policy_denied` error
 with its denied action. The host must still choose the profiles and control
 which callers receive their handles.
 

@@ -3,7 +3,7 @@ Code.require_file("probes.exs", __DIR__)
 
 defmodule SearchSpike.ProbeRun do
   @moduledoc false
-  alias Jido.Workspace
+  alias Jido.Realm.Host
   alias SearchSpike.{Fixture, Probes}
   @sizes %{"small" => 1, "medium" => 16, "large" => 128}
   @queries [
@@ -59,7 +59,7 @@ defmodule SearchSpike.ProbeRun do
   defp run_size(size, runs, dense, bash, rg) do
     root = Path.join(System.tmp_dir!(), "search-probe-#{System.unique_integer([:positive])}")
     File.mkdir_p!(root)
-    {:ok, workspace} = Workspace.open()
+    {:ok, workspace} = Host.open()
     sessions_key = make_ref()
     Process.put(sessions_key, [])
 
@@ -173,7 +173,7 @@ defmodule SearchSpike.ProbeRun do
       }
     after
       Enum.each(Process.delete(sessions_key), &Jido.Shell.ShellSession.stop/1)
-      Workspace.close(workspace)
+      Host.close(workspace)
       File.rm_rf!(root)
     end
   end
@@ -184,10 +184,10 @@ defmodule SearchSpike.ProbeRun do
       target = Path.join(path, entry)
 
       if File.dir?(source) do
-        :ok = Workspace.mkdir(workspace, target)
+        :ok = Host.mkdir(workspace, target)
         load(workspace, source, target)
       else
-        :ok = Workspace.write(workspace, target, File.read!(source))
+        :ok = Host.write(workspace, target, File.read!(source))
       end
     end
   end

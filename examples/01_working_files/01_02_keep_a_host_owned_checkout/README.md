@@ -7,7 +7,7 @@ Set the absolute directory path in a named profile. Use a checkout that the
 host can give to the program for the duration of the workspace.
 
 ```elixir
-config :jido_workspace,
+config :jido_realm,
   profiles: %{
     review: %{
       provider: :docker,
@@ -23,16 +23,16 @@ Once the profile and a checkout with `draft.txt` are ready, run the same file
 and command calls as in the disposable workspace example.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
-{:ok, workspace} = Workspace.open(profile: :review)
+{:ok, workspace} = Host.open(profile: :review)
 
 try do
-  :ok = Workspace.write(workspace, "draft.txt", "Revised draft\n")
+  :ok = Host.write(workspace, "draft.txt", "Revised draft\n")
   {:ok, %{exit_status: 0, output: "Revised draft\n"}} =
-    Workspace.run(workspace, ["cat", "draft.txt"])
+    Host.run(workspace, ["cat", "draft.txt"])
 after
-  :ok = Workspace.close(workspace)
+  :ok = Host.close(workspace)
 end
 ```
 
@@ -52,14 +52,14 @@ continue. The host manages Git status, commits, and cleanup.
   includes a second profile that uses another path to the same directory.
 - After controller loss, the host can inspect the containers, let a command
   finish, or stop it. Inspect the containers with the
-  `dev.jido.workspace.checkout` label. The command and its
-  `jido-checkout-*` reservation share a `dev.jido.workspace.sandbox` label.
+  `dev.jido.realm.checkout` label. The command and its
+  `jido-checkout-*` reservation share a `dev.jido.realm.sandbox` label.
   Remove the reservation only after all command containers for that sandbox
   have been removed and the controller can no longer start a command.
 
-The reservation applies to Workspace on the same Docker engine. The host
-coordinates its own edits, processes outside Workspace, and other engines.
-Keep the directory path in place while it is open. Workspace can detect a
+The reservation applies to Realm on the same Docker engine. The host
+coordinates its own edits, processes outside Realm, and other engines.
+Keep the directory path in place while it is open. Realm can detect a
 replaced directory at the start of an operation.
 
 ## Run the example

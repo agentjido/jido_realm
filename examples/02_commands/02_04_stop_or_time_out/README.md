@@ -1,24 +1,24 @@
 # 02.04 Stop or time out a command
 
 Run the command in a caller task when another process must be able to
-stop it. Read `active_execution_id` with `Workspace.info/1` or from a
-command start event. Pass that ID to `Workspace.cancel/2`.
+stop it. Read `active_execution_id` with `Host.info/1` or from a
+command start event. Pass that ID to `Host.cancel/2`.
 [Command events](../../05_lifecycle/05_04_inspect_state/README.md)
 
 ```elixir
-alias Jido.Workspace
-alias Jido.Workspace.Examples.StopCommand
+alias Jido.Realm.Host
+alias Jido.Realm.Host.Examples.StopCommand
 
 run = Task.async(fn ->
-  Workspace.run(workspace, ["sleep", "30"], timeout_ms: 10_000, output_limit: 200)
+  Host.run(workspace, ["sleep", "30"], timeout_ms: 10_000, output_limit: 200)
 end)
 
-# After Workspace admits the command
-{:ok, %{active_execution_id: id}} = Workspace.info(workspace)
+# After Realm admits the command
+{:ok, %{active_execution_id: id}} = Host.info(workspace)
 result = StopCommand.cancel_and_wait(workspace, id, run, 500)
 ```
 
-`Workspace.cancel/2` acknowledges the request. The tree stays busy while
+`Host.cancel/2` acknowledges the request. The tree stays busy while
 the command stops. Wait for the original run result before requesting a
 write or save. The example helper returns `{:pending, task}` when the
 caller's wait expires. Use that task to observe the result later.
@@ -26,15 +26,15 @@ caller's wait expires. Use that task to observe the result later.
 
 | Run result | What the caller knows |
 | --- | --- |
-| `{:ok, %{status: :cancelled}}` | Workspace confirmed the stop. The result includes captured output within the byte limit. |
-| `{:ok, %{status: :timed_out}}` | The execution deadline expired and Workspace confirmed the stop. The result includes captured output within the byte limit. |
+| `{:ok, %{status: :cancelled}}` | Realm confirmed the stop. The result includes captured output within the byte limit. |
+| `{:ok, %{status: :timed_out}}` | The execution deadline expired and Realm confirmed the stop. The result includes captured output within the byte limit. |
 | `{:ok, %{status: :exited}}` | The command finished. Check the exit status. Completion can occur during the cancel request. |
-| `{:error, %Workspace.Error{code: :quiescence_unknown}}` | Workspace could not confirm that writers stopped. It fences writes and saves. |
+| `{:error, %Host.Error{code: :quiescence_unknown}}` | Realm could not confirm that writers stopped. It fences writes and saves. |
 
 An ID from an earlier command returns `:execution_not_active`. A stopped
 command can leave effects from before the stop. Review the tree before
 save. If the result is `:quiescence_unknown`, keep the last known snapshot
-and call `Workspace.close/2` to request resource release. Check its result.
+and call `Host.close/2` to request resource release. Check its result.
 [Close while work is running](../../05_lifecycle/05_02_race_close_with_work/README.md)
 
 ## Run the tests

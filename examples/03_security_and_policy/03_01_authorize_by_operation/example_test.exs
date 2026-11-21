@@ -1,15 +1,15 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.PublishReportTest do
+defmodule Jido.Realm.Host.Examples.PublishReportTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution, Info}
-  alias Jido.Workspace.Examples.PublishReport
-  import Jido.Workspace.Examples.LifecycleSupport, only: [configure: 1]
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution, Info}
+  alias Jido.Realm.Host.Examples.PublishReport
+  import Jido.Realm.Host.Examples.LifecycleSupport, only: [configure: 1]
 
   @path "report.txt"
   @report "Reviewed report\n"
@@ -54,7 +54,7 @@ defmodule Jido.Workspace.Examples.PublishReportTest do
       end)
 
     with_workspace(:memory, [from: snapshot], fn workspace ->
-      assert {:ok, @report} = Workspace.read(workspace, @path)
+      assert {:ok, @report} = Host.read(workspace, @path)
     end)
 
     assert File.ls!(checkout) == [@path]
@@ -66,15 +66,15 @@ defmodule Jido.Workspace.Examples.PublishReportTest do
       put_profile(:invalid, :memory, grants)
 
       assert {:error, %Error{code: :invalid_profile, operation: :open}} =
-               Workspace.open(profile: :invalid)
+               Host.open(profile: :invalid)
     end
   end
 
   defp check_permissions(provider) do
     snapshot =
       with_workspace(provider, [], fn workspace ->
-        assert :ok = Workspace.write(workspace, @path, @report)
-        assert {:ok, snapshot} = Workspace.save(workspace)
+        assert :ok = Host.write(workspace, @path, @report)
+        assert {:ok, snapshot} = Host.save(workspace)
         snapshot
       end)
 
@@ -89,60 +89,60 @@ defmodule Jido.Workspace.Examples.PublishReportTest do
     from = [from: snapshot]
 
     with_workspace(:editor, from, fn workspace ->
-      assert {:ok, @report} = Workspace.read(workspace, @path)
-      assert :ok = Workspace.write(workspace, @path, "New edits\n")
-      assert_denied(Workspace.run(workspace, ["cat", @path]), :run, :execute)
-      assert_denied(Workspace.save(workspace), :save, :save)
+      assert {:ok, @report} = Host.read(workspace, @path)
+      assert :ok = Host.write(workspace, @path, "New edits\n")
+      assert_denied(Host.run(workspace, ["cat", @path]), :run, :execute)
+      assert_denied(Host.save(workspace), :save, :save)
     end)
 
     with_workspace(:inspector, from, fn workspace ->
-      assert {:ok, %Info{policy: [:import, :read, :execute]}} = Workspace.info(workspace)
+      assert {:ok, %Info{policy: [:import, :read, :execute]}} = Host.info(workspace)
       check_read_only_execution(workspace, provider)
     end)
 
     with_workspace(:builder, from, fn workspace ->
       assert {:ok, %Execution{exit_status: 0}} =
-               Workspace.run(workspace, ["cp", @path, "copy.txt"])
+               Host.run(workspace, ["cp", @path, "copy.txt"])
 
-      assert {:ok, @report} = Workspace.read(workspace, "copy.txt")
-      assert_denied(Workspace.save(workspace), :save, :save)
+      assert {:ok, @report} = Host.read(workspace, "copy.txt")
+      assert_denied(Host.save(workspace), :save, :save)
     end)
 
     with_workspace(:publisher, from, fn workspace ->
-      assert_denied(Workspace.write(workspace, @path, "Edit"), :write, :write)
-      assert_denied(Workspace.run(workspace, ["cat", @path]), :run, :execute)
+      assert_denied(Host.write(workspace, @path, "Edit"), :write, :write)
+      assert_denied(Host.run(workspace, ["cat", @path]), :run, :execute)
 
       assert {:ok, %{report: @report, snapshot: ^snapshot}} =
                PublishReport.publish(workspace, @path)
     end)
 
     with_workspace(:import_only, from, fn workspace ->
-      assert_denied(Workspace.read(workspace, @path), :read, :read)
+      assert_denied(Host.read(workspace, @path), :read, :read)
     end)
 
     with_workspace(:fresh, [], fn workspace ->
-      assert {:ok, []} = Workspace.list(workspace)
+      assert {:ok, []} = Host.list(workspace)
     end)
 
-    assert_denied(Workspace.open([profile: :fresh] ++ from), :open, :import)
-    assert_denied(Workspace.open(profile: :fresh, from: %{}), :open, :import)
-    assert_denied(Workspace.open([profile: :other_store] ++ from), :open, :import)
+    assert_denied(Host.open([profile: :fresh] ++ from), :open, :import)
+    assert_denied(Host.open(profile: :fresh, from: %{}), :open, :import)
+    assert_denied(Host.open([profile: :other_store] ++ from), :open, :import)
   end
 
   defp check_read_only_execution(workspace, provider) do
     assert {:ok, %Execution{exit_status: 0, output: @report}} =
-             Workspace.run(workspace, ["cat", @path])
+             Host.run(workspace, ["cat", @path])
 
-    assert_denied(Workspace.write(workspace, @path, "Edit"), :write, :write)
+    assert_denied(Host.write(workspace, @path, "Edit"), :write, :write)
 
     source = Stream.map([@report], fn _ -> flunk("A denied write read its source") end)
-    assert_denied(Workspace.write_stream(workspace, @path, source), :write_stream, :write)
+    assert_denied(Host.write_stream(workspace, @path, source), :write_stream, :write)
 
-    result = Workspace.run(workspace, ["cp", @path, "copy.txt"])
+    result = Host.run(workspace, ["cp", @path, "copy.txt"])
     assert_command_write_denied(result, provider)
 
-    assert {:error, %Error{code: :not_found}} = Workspace.read(workspace, "copy.txt")
-    assert {:ok, @report} = Workspace.read(workspace, @path)
+    assert {:error, %Error{code: :not_found}} = Host.read(workspace, "copy.txt")
+    assert {:ok, @report} = Host.read(workspace, @path)
   end
 
   defp assert_command_write_denied(result, :memory), do: assert_denied(result, :run, :execute)
@@ -159,18 +159,18 @@ defmodule Jido.Workspace.Examples.PublishReportTest do
   end
 
   defp put_profile(name, provider, grants, options \\ %{}) do
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
     profile = profiles |> Map.fetch!(provider) |> Map.put(:policy, grants) |> Map.merge(options)
-    Application.put_env(:jido_workspace, :profiles, Map.put(profiles, name, profile))
+    Application.put_env(:jido_realm, :profiles, Map.put(profiles, name, profile))
   end
 
   defp with_workspace(name, opts, fun) do
-    assert {:ok, workspace} = Workspace.open([profile: name] ++ opts)
+    assert {:ok, workspace} = Host.open([profile: name] ++ opts)
 
     try do
       fun.(workspace)
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 end

@@ -1,7 +1,7 @@
 import Config
 
 # Default workspace configuration
-config :jido_workspace,
+config :jido_realm,
   default_adapter: Jido.VFS.Adapter.InMemory
 
 if config_env() == :dev do
@@ -17,9 +17,9 @@ if config_env() == :dev do
     ]
 
   config :git_ops,
-    mix_project: Jido.Workspace.MixProject,
+    mix_project: Jido.Realm.MixProject,
     changelog_file: "CHANGELOG.md",
-    repository_url: "https://github.com/agentjido/jido_workspace",
+    repository_url: "https://github.com/agentjido/jido_realm",
     manage_mix_version?: true,
     version_tag_prefix: "v",
     types: [

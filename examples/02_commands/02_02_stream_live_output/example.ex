@@ -1,7 +1,7 @@
-defmodule Jido.Workspace.Examples.FollowOutput do
+defmodule Jido.Realm.Host.Examples.FollowOutput do
   @moduledoc "Read live command output as a stream of byte slices."
 
-  alias Jido.Workspace
+  alias Jido.Realm.Host
 
   def follow(workspace, execution_id, offset \\ 0) do
     Stream.resource(
@@ -15,7 +15,7 @@ defmodule Jido.Workspace.Examples.FollowOutput do
   end
 
   defp read(workspace, execution_id, cursor) do
-    case Workspace.output(workspace, execution_id, cursor) do
+    case Host.output(workspace, execution_id, cursor) do
       {:ok, %{done?: true} = slice} ->
         {[slice], :done}
 

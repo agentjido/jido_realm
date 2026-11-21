@@ -1,15 +1,15 @@
 Code.require_file("../06_03_recover_an_old_command/support.exs", __DIR__)
 
-defmodule Jido.Workspace.Examples.ExternalMaintainerTest do
+defmodule Jido.Realm.Host.Examples.ExternalMaintainerTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  import Jido.Workspace.Examples.RecoverySupport
+  import Jido.Realm.Host.Examples.RecoverySupport
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution}
-  alias Jido.Workspace.Examples.{MachinePool, RecoveryHost, RecoveryProvider}
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution}
+  alias Jido.Realm.Host.Examples.{MachinePool, RecoveryHost, RecoveryProvider}
 
   @maintainer_script """
   printf '%s\n' "$1" > review.txt
@@ -29,12 +29,12 @@ defmodule Jido.Workspace.Examples.ExternalMaintainerTest do
   test "the Workspace lease and the external console share one writer slot", %{tmp_dir: root} do
     %{pool: pool, host: host, machine: machine, tree: tree} = fixture(root)
     assert {:ok, original} = MachinePool.inspect_machine(pool, machine)
-    assert {:ok, workspace} = Workspace.open(profile: :run, infrastructure: machine)
-    assert :ok = Workspace.write(workspace, "draft.txt", "initial draft\n")
+    assert {:ok, workspace} = Host.open(profile: :run, infrastructure: machine)
+    assert :ok = Host.write(workspace, "draft.txt", "initial draft\n")
     assert {:ok, old_lease} = RecoveryHost.current_writer(host, machine)
     maintenance_id = "review-change-1"
     ref = new_reference(machine, "before-review")
-    started = Task.async(fn -> Workspace.run(workspace, ["write-report"], command: ref) end)
+    started = Task.async(fn -> Host.run(workspace, ["write-report"], command: ref) end)
     assert :ok = await_start(tree, ref)
 
     assert {:error, :infrastructure_busy} =
@@ -54,12 +54,12 @@ defmodule Jido.Workspace.Examples.ExternalMaintainerTest do
     assert {:ok, ^console} = RecoveryHost.begin_maintenance(host, machine, maintenance_id)
     assert_workspace_busy(machine)
 
-    assert {:error, %Error{code: :lease_revoked}} = Workspace.save(workspace)
+    assert {:error, %Error{code: :lease_revoked}} = Host.save(workspace)
 
     assert {:error, %Error{code: :lease_revoked}} =
-             Workspace.write(workspace, "draft.txt", "stale")
+             Host.write(workspace, "draft.txt", "stale")
 
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.close(workspace)
     assert_workspace_busy(machine)
 
     assert :ok =
@@ -95,26 +95,26 @@ defmodule Jido.Workspace.Examples.ExternalMaintainerTest do
     assert status != 0
     assert {:ok, ^original} = MachinePool.inspect_machine(pool, machine)
 
-    assert {:ok, replacement} = Workspace.open(profile: :run, infrastructure: machine)
+    assert {:ok, replacement} = Host.open(profile: :run, infrastructure: machine)
 
     try do
       assert :ok = RecoveryHost.end_maintenance(host, machine, maintenance_id)
       assert_workspace_busy(machine)
-      assert {:ok, "approved; Q4\n"} = Workspace.read(replacement, "review.txt")
-      assert :ok = Workspace.write(replacement, "published.txt", "ready\n")
-      assert {:ok, saved} = Workspace.save(replacement)
-      assert {:ok, restored} = Workspace.open(profile: :memory, from: saved)
+      assert {:ok, "approved; Q4\n"} = Host.read(replacement, "review.txt")
+      assert :ok = Host.write(replacement, "published.txt", "ready\n")
+      assert {:ok, saved} = Host.save(replacement)
+      assert {:ok, restored} = Host.open(profile: :memory, from: saved)
 
       try do
-        assert {:ok, "initial draft\n"} = Workspace.read(restored, "draft.txt")
-        assert {:ok, "approved; Q4\n"} = Workspace.read(restored, "review.txt")
-        assert {:ok, "finished review\n"} = Workspace.read(restored, "review-log.txt")
-        assert {:ok, "ready\n"} = Workspace.read(restored, "published.txt")
+        assert {:ok, "initial draft\n"} = Host.read(restored, "draft.txt")
+        assert {:ok, "approved; Q4\n"} = Host.read(restored, "review.txt")
+        assert {:ok, "finished review\n"} = Host.read(restored, "review-log.txt")
+        assert {:ok, "ready\n"} = Host.read(restored, "published.txt")
       after
-        assert :ok = Workspace.close(restored)
+        assert :ok = Host.close(restored)
       end
     after
-      assert :ok = Workspace.close(replacement)
+      assert :ok = Host.close(replacement)
     end
 
     assert {:error, :maintenance_closed} =
@@ -138,6 +138,6 @@ defmodule Jido.Workspace.Examples.ExternalMaintainerTest do
 
   defp assert_workspace_busy(machine) do
     assert {:error, %Error{code: :infrastructure_busy}} =
-             Workspace.open(profile: :run, infrastructure: machine)
+             Host.open(profile: :run, infrastructure: machine)
   end
 end

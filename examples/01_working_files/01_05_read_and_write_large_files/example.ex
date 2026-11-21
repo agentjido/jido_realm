@@ -1,19 +1,19 @@
-defmodule Jido.Workspace.Examples.TransferFiles do
-  alias Jido.Workspace
+defmodule Jido.Realm.Host.Examples.TransferFiles do
+  alias Jido.Realm.Host
 
   @chunk_size 65_536
 
   def copy(workspace, source, destination) do
     chunks =
       Stream.unfold(0, fn offset ->
-        case Workspace.read_chunk(workspace, source, offset, @chunk_size) do
+        case Host.read_chunk(workspace, source, offset, @chunk_size) do
           {:ok, ""} -> nil
           {:ok, bytes} -> {bytes, offset + byte_size(bytes)}
           {:error, error} -> raise "Source read failed (#{error.code})"
         end
       end)
 
-    Workspace.write_stream(workspace, destination, chunks)
+    Host.write_stream(workspace, destination, chunks)
   end
 
   def checksum(workspace, path) do
@@ -21,7 +21,7 @@ defmodule Jido.Workspace.Examples.TransferFiles do
   end
 
   defp checksum(workspace, path, offset, hash) do
-    case Workspace.read_chunk(workspace, path, offset, @chunk_size) do
+    case Host.read_chunk(workspace, path, offset, @chunk_size) do
       {:ok, ""} ->
         {:ok, offset, :crypto.hash_final(hash)}
 

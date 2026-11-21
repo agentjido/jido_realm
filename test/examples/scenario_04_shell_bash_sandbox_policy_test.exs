@@ -1,12 +1,12 @@
-defmodule Jido.Workspace.Integration.Scenario04ShellBashSandboxPolicyTest do
+defmodule Jido.Realm.Host.Integration.Scenario04ShellBashSandboxPolicyTest do
   use ExUnit.Case, async: false
 
   @moduledoc """
   Scenario 04 goal: Verify bash sandbox network limits and allowlist behavior using execution_context.
   """
 
-  alias Jido.Workspace
-  alias Jido.Workspace.TestSupport.ScenarioHelpers
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.TestSupport.ScenarioHelpers
 
   @moduletag :integration
   @moduletag :local_integration
@@ -26,7 +26,7 @@ defmodule Jido.Workspace.Integration.Scenario04ShellBashSandboxPolicyTest do
     end)
 
     try do
-      :ok = Workspace.mkdir(workspace, "/artifacts")
+      :ok = Host.mkdir(workspace, "/artifacts")
       ScenarioHelpers.put_workspace(workspace)
 
       {deny_error, workspace} = run_expect_error(workspace, @command)
@@ -44,7 +44,7 @@ defmodule Jido.Workspace.Integration.Scenario04ShellBashSandboxPolicyTest do
       assert :start_failed = allow_error.code
       assert allow_error.details.cause == "{:shell, :unknown_command}"
 
-      :ok = Workspace.stop_session(workspace)
+      :ok = Host.stop_session(workspace)
       ScenarioHelpers.put_workspace(workspace)
 
       matrix_json =
@@ -61,8 +61,8 @@ defmodule Jido.Workspace.Integration.Scenario04ShellBashSandboxPolicyTest do
           ]
         )
 
-      :ok = Workspace.write(workspace, @matrix_path, matrix_json)
-      :ok = Workspace.write(workspace, @summary_path, matrix_json)
+      :ok = Host.write(workspace, @matrix_path, matrix_json)
+      :ok = Host.write(workspace, @summary_path, matrix_json)
       ScenarioHelpers.put_workspace(workspace)
 
       matrix_file = Path.join(output_root, "artifacts/network_policy.json")
@@ -83,8 +83,8 @@ defmodule Jido.Workspace.Integration.Scenario04ShellBashSandboxPolicyTest do
   end
 
   defp run_expect_error(workspace, command, opts \\ []) do
-    case Workspace.run(workspace, command, opts) do
-      {:error, %Jido.Workspace.Error{} = error} ->
+    case Host.run(workspace, command, opts) do
+      {:error, %Jido.Realm.Host.Error{} = error} ->
         {error, workspace}
 
       {:ok, %{output: output}} ->

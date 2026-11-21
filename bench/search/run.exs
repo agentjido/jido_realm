@@ -2,7 +2,7 @@ Code.require_file("support.exs", __DIR__)
 
 defmodule SearchSpike.Run do
   @moduledoc false
-  alias Jido.Workspace
+  alias Jido.Realm.Host
   alias SearchSpike.Fixture
   @sizes %{"small" => 1, "medium" => 16, "large" => 128}
   @queries [
@@ -51,8 +51,8 @@ defmodule SearchSpike.Run do
   defp run_size(size, runs, rg, bash) do
     root = Path.join(System.tmp_dir!(), "search-spike-#{System.unique_integer([:positive])}")
     File.mkdir_p!(root)
-    {:ok, memory} = Workspace.open()
-    {:ok, local} = Workspace.open(adapter: Jido.VFS.Adapter.Local, adapter_opts: [prefix: root])
+    {:ok, memory} = Host.open()
+    {:ok, local} = Host.open(adapter: Jido.VFS.Adapter.Local, adapter_opts: [prefix: root])
 
     try do
       files = div(Map.fetch!(@sizes, size) * 1_048_576, 16_384)
@@ -72,8 +72,8 @@ defmodule SearchSpike.Run do
       {load_us, _} = :timer.tc(fn -> load_memory(memory, root, "/") end)
       :erlang.garbage_collect()
       memory_delta = :erlang.memory(:total) - before_bytes
-      {:ok, memory_session} = Workspace.start_session(memory, backend: {SearchSpike.Backend, %{}})
-      {:ok, local_session} = Workspace.start_session(local, backend: {SearchSpike.Backend, %{}})
+      {:ok, memory_session} = Host.start_session(memory, backend: {SearchSpike.Backend, %{}})
+      {:ok, local_session} = Host.start_session(local, backend: {SearchSpike.Backend, %{}})
 
       queries =
         Enum.map(@queries, fn {name, mode, pattern} ->
@@ -123,8 +123,8 @@ defmodule SearchSpike.Run do
         queries: queries
       }
     after
-      Workspace.close(memory)
-      Workspace.close(local)
+      Host.close(memory)
+      Host.close(local)
       File.rm_rf!(root)
     end
   end
@@ -135,10 +135,10 @@ defmodule SearchSpike.Run do
       target = Path.join(path, entry)
 
       if File.dir?(source) do
-        :ok = Workspace.mkdir(workspace, target)
+        :ok = Host.mkdir(workspace, target)
         load_memory(workspace, source, target)
       else
-        :ok = Workspace.write(workspace, target, File.read!(source))
+        :ok = Host.write(workspace, target, File.read!(source))
       end
     end
   end

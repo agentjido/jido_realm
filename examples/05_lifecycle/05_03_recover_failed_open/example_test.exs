@@ -1,24 +1,24 @@
 Code.require_file("../support.exs", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.ReopenReportTest do
+defmodule Jido.Realm.Host.Examples.ReopenReportTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
   alias Jido.Shell.VFS.MountTable
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, ProfileSession, Sandbox}
-  alias Jido.Workspace.Examples.ReopenReport
-  import Jido.Workspace.Examples.LifecycleSupport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, ProfileSession, Sandbox}
+  alias Jido.Realm.Host.Examples.ReopenReport
+  import Jido.Realm.Host.Examples.LifecycleSupport
 
   setup %{tmp_dir: root} do
     configure(Path.join(root, "snapshots"))
-    assert {:ok, workspace} = Workspace.open(profile: :memory)
+    assert {:ok, workspace} = Host.open(profile: :memory)
     {controller, _memory} = provider(workspace, :memory)
-    assert :ok = Workspace.write(workspace, "report.txt", "Saved report")
-    assert {:ok, snapshot} = Workspace.save(workspace)
-    assert :ok = Workspace.close(workspace)
+    assert :ok = Host.write(workspace, "report.txt", "Saved report")
+    assert {:ok, snapshot} = Host.save(workspace)
+    assert :ok = Host.close(workspace)
 
     await(
       fn -> controller not in children(ProfileSession.Supervisor) end,
@@ -42,7 +42,7 @@ defmodule Jido.Workspace.Examples.ReopenReportTest do
     {task, namespace} =
       with_suspended(MountTable, fn ->
         task =
-          Task.async(fn -> Workspace.open(profile: :memory, from: snapshot, owner: owner) end)
+          Task.async(fn -> Host.open(profile: :memory, from: snapshot, owner: owner) end)
 
         namespace = pending_mount()
         send(owner, :stop)
@@ -63,7 +63,7 @@ defmodule Jido.Workspace.Examples.ReopenReportTest do
       with_suspended(MountTable, fn ->
         {opener, ref} =
           spawn_monitor(fn ->
-            Workspace.open(profile: :memory, from: snapshot, owner: owner)
+            Host.open(profile: :memory, from: snapshot, owner: owner)
           end)
 
         namespace = pending_mount()
@@ -76,7 +76,7 @@ defmodule Jido.Workspace.Examples.ReopenReportTest do
     assert [] = MountTable.list(namespace)
 
     # A caller can hand off a successful open and then exit.
-    task = Task.async(fn -> Workspace.open(profile: :memory, from: snapshot, owner: owner) end)
+    task = Task.async(fn -> Host.open(profile: :memory, from: snapshot, owner: owner) end)
     assert {:ok, workspace} = Task.await(task)
     assert_report_and_close(workspace)
   end
@@ -178,9 +178,9 @@ defmodule Jido.Workspace.Examples.ReopenReportTest do
 
   defp assert_report_and_close(workspace) do
     try do
-      assert {:ok, "Saved report"} = Workspace.read(workspace, "report.txt")
+      assert {:ok, "Saved report"} = Host.read(workspace, "report.txt")
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 

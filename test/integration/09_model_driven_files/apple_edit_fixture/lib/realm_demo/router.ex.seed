@@ -1,0 +1,5 @@
+defmodule RealmDemo.Router do
+  use Phoenix.Router
+
+  get("/", RealmDemo.Page, :home)
+end

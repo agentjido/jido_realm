@@ -1,4 +1,4 @@
-defmodule Jido.Workspace.Sandbox.DockerTest do
+defmodule Jido.Realm.Host.Sandbox.DockerTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :docker
@@ -7,9 +7,9 @@ defmodule Jido.Workspace.Sandbox.DockerTest do
   if System.get_env("JIDO_SANDBOX_DOCKER") != "1",
     do: @moduletag(skip: "Set JIDO_SANDBOX_DOCKER=1 for live Docker tests")
 
-  alias Jido.Workspace.Sandbox
-  alias Jido.Workspace.Sandbox.Backends.Docker
-  alias Jido.Workspace.TestSupport.{Actions, BoundaryAgent}
+  alias Jido.Realm.Host.Sandbox
+  alias Jido.Realm.Host.Sandbox.Backends.Docker
+  alias Jido.Realm.Host.TestSupport.{Actions, BoundaryAgent}
 
   defp image, do: System.get_env("JIDO_SANDBOX_IMAGE", "alpine:latest")
   defp runtime, do: System.get_env("JIDO_SANDBOX_RUNTIME", "runc")
@@ -39,7 +39,7 @@ defmodule Jido.Workspace.Sandbox.DockerTest do
     {ids, 0} =
       System.cmd(
         "docker",
-        ["ps", "--all", "--quiet", "--filter", "label=dev.jido.workspace.sandbox=" <> sandbox.id],
+        ["ps", "--all", "--quiet", "--filter", "label=dev.jido.realm.sandbox=" <> sandbox.id],
         stderr_to_stdout: true
       )
 
@@ -162,7 +162,10 @@ defmodule Jido.Workspace.Sandbox.DockerTest do
     assert attached.provider == :docker
     assert attached.pid == sandbox.pid
     assert Sandbox.capabilities(%{attached | provider: :local, root: "/"}).provider == :docker
-    assert :ok = DynamicSupervisor.terminate_child(Jido.Workspace.Sandbox.Supervisor, sandbox.pid)
+
+    assert :ok =
+             DynamicSupervisor.terminate_child(Jido.Realm.Host.Sandbox.Supervisor, sandbox.pid)
+
     assert containers(sandbox) == []
     assert {:error, :not_found} = Sandbox.attach(sandbox.id)
   end
@@ -208,7 +211,7 @@ defmodule Jido.Workspace.Sandbox.DockerTest do
     assert {:error, {:image_unavailable, _}} =
              Sandbox.open(
                provider: :docker,
-               image: "jido-workspace-does-not-exist:missing",
+               image: "jido-realm-does-not-exist:missing",
                root: root
              )
 
@@ -277,7 +280,7 @@ defmodule Jido.Workspace.Sandbox.DockerTest do
 
   defp request(agent, access, params, outcome \\ "succeeded") do
     signal =
-      Jido.Signal.new!("jido.workspace.v1.sandbox.exec.requested", params,
+      Jido.Signal.new!("realm.host.v1.sandbox.exec.requested", params,
         source: "/sandbox/docker-test"
       )
 
@@ -290,7 +293,7 @@ defmodule Jido.Workspace.Sandbox.DockerTest do
     expected_status = if outcome == "succeeded", do: :committed, else: :failed
     assert %Jido.AgentServer.TurnResult{status: ^expected_status} = turn
 
-    type = "jido.workspace.v1.sandbox.exec." <> outcome
+    type = "realm.host.v1.sandbox.exec." <> outcome
     causation = signal.id
 
     assert_receive {:signal, %Jido.Signal{type: ^type, data: %{causation_id: ^causation} = data}},

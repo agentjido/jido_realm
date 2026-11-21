@@ -2,15 +2,15 @@ Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 Code.require_file("../../05_lifecycle/05_04_inspect_state/example.ex", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.VerifyCredentialTest do
+defmodule Jido.Realm.Host.Examples.VerifyCredentialTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution}
-  alias Jido.Workspace.Examples.{ObserveCommand, VerifyCredential}
-  import Jido.Workspace.Examples.LifecycleSupport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution}
+  alias Jido.Realm.Host.Examples.{ObserveCommand, VerifyCredential}
+  import Jido.Realm.Host.Examples.LifecycleSupport
 
   setup %{tmp_dir: root}, do: configure(Path.join(root, "snapshots"))
 
@@ -22,7 +22,7 @@ defmodule Jido.Workspace.Examples.VerifyCredentialTest do
     })
 
     assert {:error, %Error{operation: :open, code: :unsupported_capability}} =
-             Workspace.open(profile: :credential)
+             Host.open(profile: :credential)
   end
 
   if System.get_env("JIDO_SANDBOX_DOCKER") != "1" do
@@ -40,10 +40,10 @@ defmodule Jido.Workspace.Examples.VerifyCredentialTest do
     with_workspace([profile: :credential], fn workspace ->
       {controller, sandbox} = provider(workspace, :native)
       clean_up_docker_on_failure(sandbox)
-      assert {:ok, before_run} = Workspace.save(workspace)
+      assert {:ok, before_run} = Host.save(workspace)
 
       assert {:error, %Error{operation: :run, code: :policy_denied}} =
-               Workspace.run(workspace, ["/bin/sh"], stdin: :pipe)
+               Host.run(workspace, ["/bin/sh"], stdin: :pipe)
 
       assert {:ok, observer} = ObserveCommand.attach(workspace)
 
@@ -77,7 +77,7 @@ defmodule Jido.Workspace.Examples.VerifyCredentialTest do
         assert {"none " <> config, 0} = docker(["inspect", "--format", template, container])
         refute contains_fixture?(config, fixture)
 
-        assert :ok = Workspace.input(workspace, id, "finish\n")
+        assert :ok = Host.input(workspace, id, "finish\n")
 
         assert {:ok,
                 %Execution{
@@ -93,7 +93,7 @@ defmodule Jido.Workspace.Examples.VerifyCredentialTest do
                          stopped
 
         assert {:ok, %{bytes: "", next_offset: ^count, dropped_bytes: ^count, done?: true}} =
-                 Workspace.output(workspace, id)
+                 Host.output(workspace, id)
 
         assert {:error, %Error{operation: :input, code: :execution_not_active} = late} =
                  VerifyCredential.submit(workspace, id, fixture)
@@ -103,22 +103,22 @@ defmodule Jido.Workspace.Examples.VerifyCredentialTest do
         :telemetry.detach(observer)
       end
 
-      assert {:error, %Error{code: :not_found}} = Workspace.read(workspace, "spill.txt")
-      assert {:ok, ^before_run} = Workspace.save(workspace)
+      assert {:error, %Error{code: :not_found}} = Host.read(workspace, "spill.txt")
+      assert {:ok, ^before_run} = Host.save(workspace)
 
       reference = Jason.encode!(before_run)
       refute contains_fixture?(reference, fixture)
 
       with_workspace([profile: :memory, from: Jason.decode!(reference)], fn restored ->
-        assert {:ok, ^script} = Workspace.read(restored, "bin/verify")
-        assert {:error, %Error{code: :not_found}} = Workspace.read(restored, "spill.txt")
+        assert {:ok, ^script} = Host.read(restored, "bin/verify")
+        assert {:error, %Error{code: :not_found}} = Host.read(restored, "spill.txt")
       end)
     end)
   end
 
   defp configure_profile(name, profile) do
-    profiles = Application.fetch_env!(:jido_workspace, :profiles)
-    Application.put_env(:jido_workspace, :profiles, Map.put(profiles, name, profile))
+    profiles = Application.fetch_env!(:jido_realm, :profiles)
+    Application.put_env(:jido_realm, :profiles, Map.put(profiles, name, profile))
   end
 
   defp install_verifier(checkout) do
@@ -162,7 +162,7 @@ defmodule Jido.Workspace.Examples.VerifyCredentialTest do
   defp await_discard(workspace, id, count) do
     await(
       fn ->
-        case Workspace.output(workspace, id) do
+        case Host.output(workspace, id) do
           {:ok, %{next_offset: ^count, done?: false} = slice} -> slice
           _ -> nil
         end
@@ -185,12 +185,12 @@ defmodule Jido.Workspace.Examples.VerifyCredentialTest do
   end
 
   defp with_workspace(options, fun) do
-    assert {:ok, workspace} = Workspace.open(options)
+    assert {:ok, workspace} = Host.open(options)
 
     try do
       fun.(workspace)
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 end

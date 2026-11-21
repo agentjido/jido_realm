@@ -1,0 +1,39 @@
+defmodule RealmDemo.RoundAcceptanceTest do
+  use ExUnit.Case, async: true
+
+  @round String.to_integer(System.fetch_env!("REALM_EDIT_ROUND"))
+
+  test "the home page retains its greeting" do
+    conn = get("/")
+    assert conn.status == 200
+    assert conn.resp_body =~ "<h1>Hello, world!</h1>"
+  end
+
+  if @round >= 1 do
+    test "the home page introduces Jido Realm" do
+      assert get("/").resp_body =~ "Jido Realm gives agents a workspace."
+    end
+  end
+
+  if @round >= 2 do
+    test "the Realm API reports readiness as JSON" do
+      conn = get("/api/realm")
+      assert conn.status == 200
+      assert [type] = Plug.Conn.get_resp_header(conn, "content-type")
+      assert type =~ "application/json"
+      assert JSON.decode!(conn.resp_body) == %{"status" => "ready"}
+    end
+  end
+
+  if @round >= 3 do
+    test "a missing route has a custom 404 page with a link home" do
+      conn = get("/missing-realm-page")
+      assert conn.status == 404
+      assert conn.resp_body =~ "Page not found"
+      assert conn.resp_body =~ ~s(href="/")
+      assert conn.resp_body =~ "Back to home"
+    end
+  end
+
+  defp get(path), do: RealmDemo.Endpoint.call(Plug.Test.conn(:get, path), [])
+end

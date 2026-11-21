@@ -1,12 +1,12 @@
-defmodule Jido.Workspace.TestSupport.ScenarioHelpers do
+defmodule Jido.Realm.Host.TestSupport.ScenarioHelpers do
   @moduledoc false
 
-  alias Jido.Workspace
+  alias Jido.Realm.Host
 
   @workspace_process_key {__MODULE__, :workspace_under_test}
 
   @spec new_local_workspace!(String.t(), String.t(), String.t()) :: %{
-          workspace: Jido.Workspace.t(),
+          workspace: Jido.Realm.Host.t(),
           workspace_id: String.t(),
           output_root: String.t()
         }
@@ -17,14 +17,14 @@ defmodule Jido.Workspace.TestSupport.ScenarioHelpers do
     :ok = File.mkdir_p!(output_root)
 
     workspace =
-      Workspace.open(
+      Host.open(
         id: workspace_id,
         adapter: Jido.VFS.Adapter.Local,
         adapter_opts: [prefix: output_root]
       )
 
     case workspace do
-      {:ok, %Jido.Workspace.Workspace{} = ws} ->
+      {:ok, %Jido.Realm.Host.Handle{} = ws} ->
         put_workspace(ws)
 
         %{
@@ -39,13 +39,13 @@ defmodule Jido.Workspace.TestSupport.ScenarioHelpers do
     end
   end
 
-  @spec put_workspace(Jido.Workspace.t()) :: Jido.Workspace.t()
-  def put_workspace(%Jido.Workspace.Workspace{} = workspace) do
+  @spec put_workspace(Jido.Realm.Host.t()) :: Jido.Realm.Host.t()
+  def put_workspace(%Jido.Realm.Host.Handle{} = workspace) do
     Process.put(@workspace_process_key, workspace)
     workspace
   end
 
-  @spec current_workspace() :: Jido.Workspace.t() | nil
+  @spec current_workspace() :: Jido.Realm.Host.t() | nil
   def current_workspace do
     Process.get(@workspace_process_key)
   end
@@ -53,8 +53,8 @@ defmodule Jido.Workspace.TestSupport.ScenarioHelpers do
   @spec close_workspace_if_present() :: :ok
   def close_workspace_if_present do
     case current_workspace() do
-      %Jido.Workspace.Workspace{} = workspace ->
-        _ = Workspace.close(workspace)
+      %Jido.Realm.Host.Handle{} = workspace ->
+        _ = Host.close(workspace)
         Process.delete(@workspace_process_key)
         :ok
 
@@ -66,8 +66,8 @@ defmodule Jido.Workspace.TestSupport.ScenarioHelpers do
   @spec write_error_artifact(String.t(), any(), Exception.stacktrace()) :: :ok
   def write_error_artifact(path, error, stacktrace) do
     case current_workspace() do
-      %Jido.Workspace.Workspace{} = workspace ->
-        _ = Workspace.write(workspace, path, error_summary_json(error, stacktrace))
+      %Jido.Realm.Host.Handle{} = workspace ->
+        _ = Host.write(workspace, path, error_summary_json(error, stacktrace))
         :ok
 
       _ ->

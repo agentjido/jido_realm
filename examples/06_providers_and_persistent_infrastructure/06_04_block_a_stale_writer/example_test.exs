@@ -1,17 +1,17 @@
 Code.require_file("../06_03_recover_an_old_command/support.exs", __DIR__)
 
-defmodule Jido.Workspace.Examples.BlockStaleWriterTest do
+defmodule Jido.Realm.Host.Examples.BlockStaleWriterTest do
   use ExUnit.Case, async: false
   @moduletag :integration
 
-  import Jido.Workspace.Examples.RecoverySupport
+  import Jido.Realm.Host.Examples.RecoverySupport
 
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution}
-  alias Jido.Workspace.Examples.{MachinePool, RecoveryHost, RecoveryProvider}
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution}
+  alias Jido.Realm.Host.Examples.{MachinePool, RecoveryHost, RecoveryProvider}
 
   defmodule RevokedProvider do
-    @behaviour Jido.Workspace.Provider
+    @behaviour Jido.Realm.Host.Provider
 
     @impl true
     def provision(lease, %{options: target}, nil) do
@@ -39,7 +39,7 @@ defmodule Jido.Workspace.Examples.BlockStaleWriterTest do
   end
 
   test "a provider-confirmed revocation fences the controller" do
-    Application.put_env(:jido_workspace, :profiles, %{
+    Application.put_env(:jido_realm, :profiles, %{
       writer: %{
         provider: {RevokedProvider, self()},
         infrastructure: MachinePool.provider(),
@@ -49,18 +49,18 @@ defmodule Jido.Workspace.Examples.BlockStaleWriterTest do
     })
 
     machine = reference("provider-resource", "command-1").infrastructure
-    assert {:ok, ws} = Workspace.open(profile: :writer, infrastructure: machine)
+    assert {:ok, ws} = Host.open(profile: :writer, infrastructure: machine)
 
     try do
-      assert {:error, %Error{code: :lease_revoked}} = Workspace.run(ws, ["write-report"])
+      assert {:error, %Error{code: :lease_revoked}} = Host.run(ws, ["write-report"])
       assert_received :tried_run
-      assert {:ok, %{phase: :lease_revoked}} = Workspace.info(ws)
-      assert {:error, %Error{code: :lease_revoked}} = Workspace.write(ws, "result", "blocked")
-      assert {:error, %Error{code: :lease_revoked}} = Workspace.save(ws)
+      assert {:ok, %{phase: :lease_revoked}} = Host.info(ws)
+      assert {:error, %Error{code: :lease_revoked}} = Host.write(ws, "result", "blocked")
+      assert {:error, %Error{code: :lease_revoked}} = Host.save(ws)
       refute_received :tried_file
       refute_received :tried_capture
     after
-      assert :ok = Workspace.close(ws)
+      assert :ok = Host.close(ws)
     end
   end
 
@@ -79,7 +79,7 @@ defmodule Jido.Workspace.Examples.BlockStaleWriterTest do
                old,
                """
                {:ok, owner} = Agent.start(fn -> nil end, name: :old_workspace)
-               {:ok, workspace} = Jido.Workspace.open(profile: :run, infrastructure: machine, owner: owner)
+               {:ok, workspace} = Jido.Realm.Host.open(profile: :run, infrastructure: machine, owner: owner)
                Agent.update(owner, fn _ -> workspace end)
                """,
                machine: machine
@@ -94,7 +94,7 @@ defmodule Jido.Workspace.Examples.BlockStaleWriterTest do
           old,
           """
           workspace = Agent.get(:old_workspace, & &1)
-          Jido.Workspace.run(workspace, ["write-report"], command: command)
+          Jido.Realm.Host.run(workspace, ["write-report"], command: command)
           """,
           command: ref
         )
@@ -106,7 +106,7 @@ defmodule Jido.Workspace.Examples.BlockStaleWriterTest do
              RecoveryProvider.capture(old_environment, %{entries: 20, bytes: 1024})
 
     assert {:error, :cleanup_unconfirmed} = RecoveryHost.revoke_writer(host, machine, old_id)
-    assert {:ok, %{status: :running}} = Workspace.recover_command(:recovery, ref, :inspect)
+    assert {:ok, %{status: :running}} = Host.recover_command(:recovery, ref, :inspect)
     assert_writer_busy(machine)
 
     folder = RecoveryHost.job_path(tree, ref)
@@ -116,27 +116,27 @@ defmodule Jido.Workspace.Examples.BlockStaleWriterTest do
     assert_writer_busy(machine)
 
     assert :ok = RecoveryHost.revoke_writer(host, machine, old_id)
-    assert {:ok, replacement} = Workspace.open(profile: :run, infrastructure: machine)
+    assert {:ok, replacement} = Host.open(profile: :run, infrastructure: machine)
 
     try do
       assert {:ok, new_id} = RecoveryHost.current_writer(host, machine)
       assert new_id != old_id
-      assert :ok = Workspace.write(replacement, "new.txt", "replacement\n")
+      assert :ok = Host.write(replacement, "new.txt", "replacement\n")
 
       assert {:ok, %{phase: :ready}} =
-               eval(old, "Jido.Workspace.info(Agent.get(:old_workspace, & &1))")
+               eval(old, "Jido.Realm.Host.info(Agent.get(:old_workspace, & &1))")
 
       assert {:error, %Error{code: :lease_revoked}} =
-               eval(old, "Jido.Workspace.save(Agent.get(:old_workspace, & &1))")
+               eval(old, "Jido.Realm.Host.save(Agent.get(:old_workspace, & &1))")
 
       assert {:error, %Error{code: :lease_revoked}} =
                eval(
                  old,
-                 ~s|Jido.Workspace.write(Agent.get(:old_workspace, & &1), "new.txt", "stale")|
+                 ~s|Jido.Realm.Host.write(Agent.get(:old_workspace, & &1), "new.txt", "stale")|
                )
 
       assert {:ok, %{phase: :lease_revoked}} =
-               eval(old, "Jido.Workspace.info(Agent.get(:old_workspace, & &1))")
+               eval(old, "Jido.Realm.Host.info(Agent.get(:old_workspace, & &1))")
 
       # These requests stand for work already sent to the provider by the old lease.
       delayed = new_reference(machine, "late-launch")
@@ -152,24 +152,24 @@ defmodule Jido.Workspace.Examples.BlockStaleWriterTest do
                })
 
       assert {:error, %Error{code: :command_not_found}} =
-               Workspace.recover_command(:recovery, delayed, :inspect)
+               Host.recover_command(:recovery, delayed, :inspect)
 
-      assert :ok = eval(old, "Jido.Workspace.close(Agent.get(:old_workspace, & &1))")
+      assert :ok = eval(old, "Jido.Realm.Host.close(Agent.get(:old_workspace, & &1))")
       assert :ok = RecoveryHost.revoke_writer(host, machine, old_id)
       assert {:ok, ^new_id} = RecoveryHost.current_writer(host, machine)
 
-      assert {:ok, snapshot} = Workspace.save(replacement)
-      assert {:ok, restored} = Workspace.open(profile: :memory, from: snapshot)
+      assert {:ok, snapshot} = Host.save(replacement)
+      assert {:ok, restored} = Host.open(profile: :memory, from: snapshot)
 
       try do
-        assert {:ok, "replacement\n"} = Workspace.read(restored, "new.txt")
+        assert {:ok, "replacement\n"} = Host.read(restored, "new.txt")
         old_report = Path.relative_to(Path.join(folder, "report"), tree)
-        assert {:ok, "complete\n"} = Workspace.read(restored, old_report)
+        assert {:ok, "complete\n"} = Host.read(restored, old_report)
       after
-        assert :ok = Workspace.close(restored)
+        assert :ok = Host.close(restored)
       end
     after
-      assert :ok = Workspace.close(replacement)
+      assert :ok = Host.close(replacement)
     end
   end
 
@@ -183,11 +183,11 @@ defmodule Jido.Workspace.Examples.BlockStaleWriterTest do
   } do
     %{host: host, machine: machine, tree: tree} = fixture(root)
     ref = new_reference(machine, "unreachable-writer")
-    assert {:ok, previous} = Workspace.open(profile: :lost_reply, infrastructure: machine)
+    assert {:ok, previous} = Host.open(profile: :lost_reply, infrastructure: machine)
     assert {:ok, previous_id} = RecoveryHost.current_writer(host, machine)
 
     assert {:error, %Error{code: :quiescence_unknown}} =
-             Workspace.run(previous, ["write-report"], command: ref)
+             Host.run(previous, ["write-report"], command: ref)
 
     assert :ok = await_start(tree, ref)
     assert :ok = RecoveryHost.set_transport(host, :offline)
@@ -195,29 +195,29 @@ defmodule Jido.Workspace.Examples.BlockStaleWriterTest do
     try do
       for action <- [:inspect, :stop] do
         assert {:error, %Error{code: :quiescence_unknown}} =
-                 Workspace.recover_command(:recovery, ref, action, timeout_ms: 2_000)
+                 Host.recover_command(:recovery, ref, action, timeout_ms: 2_000)
       end
 
       assert {:error, %Error{code: :cleanup_unconfirmed}} =
-               Workspace.open(profile: :run, infrastructure: machine, timeout_ms: 2_000)
+               Host.open(profile: :run, infrastructure: machine, timeout_ms: 2_000)
 
       assert {:error, %Error{code: :quiescence_unknown}} =
-               Workspace.write(previous, "result.txt", "blocked")
+               Host.write(previous, "result.txt", "blocked")
 
-      assert {:error, %Error{code: :quiescence_unknown}} = Workspace.save(previous)
+      assert {:error, %Error{code: :quiescence_unknown}} = Host.save(previous)
       assert {:ok, ^previous_id} = RecoveryHost.current_writer(host, machine)
     after
       assert :ok = RecoveryHost.set_transport(host, :online)
     end
 
-    assert {:ok, %{status: :running}} = Workspace.recover_command(:recovery, ref, :inspect)
+    assert {:ok, %{status: :running}} = Host.recover_command(:recovery, ref, :inspect)
     assert_writer_busy(machine)
-    assert {:ok, %{status: :exited}} = Workspace.recover_command(:recovery, ref, :stop)
+    assert {:ok, %{status: :exited}} = Host.recover_command(:recovery, ref, :stop)
     assert_writer_busy(machine)
     assert :ok = RecoveryHost.revoke_writer(host, machine, previous_id)
-    assert :ok = Workspace.close(previous)
-    assert {:ok, replacement} = Workspace.open(profile: :run, infrastructure: machine)
-    assert :ok = Workspace.close(replacement)
+    assert :ok = Host.close(previous)
+    assert {:ok, replacement} = Host.open(profile: :run, infrastructure: machine)
+    assert :ok = Host.close(replacement)
   end
 
   defp eval(peer, script, bindings \\ []) do
@@ -227,6 +227,6 @@ defmodule Jido.Workspace.Examples.BlockStaleWriterTest do
 
   defp assert_writer_busy(machine) do
     assert {:error, %Error{code: :infrastructure_busy}} =
-             Workspace.open(profile: :run, infrastructure: machine)
+             Host.open(profile: :run, infrastructure: machine)
   end
 end

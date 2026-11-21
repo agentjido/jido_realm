@@ -1,9 +1,9 @@
-defmodule Jido.Workspace.Examples.RecoveryHost do
+defmodule Jido.Realm.Host.Examples.RecoveryHost do
   @moduledoc false
   use GenServer
 
-  alias Jido.Workspace.Examples.{MachinePool, MachineProvider, RecoveryProvider}
-  alias Jido.Workspace.Sandbox.Files
+  alias Jido.Realm.Host.Examples.{MachinePool, MachineProvider, RecoveryProvider}
+  alias Jido.Realm.Host.Sandbox.Files
 
   @script """
   printf 'started\n' >> "$1/starts"

@@ -1,14 +1,14 @@
 Code.require_file("../support.exs", __DIR__)
 Code.require_file("example.ex", __DIR__)
 
-defmodule Jido.Workspace.Examples.OwnedReportTest do
+defmodule Jido.Realm.Host.Examples.OwnedReportTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.Examples.OwnedReport
-  import Jido.Workspace.Examples.LifecycleSupport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.Examples.OwnedReport
+  import Jido.Realm.Host.Examples.LifecycleSupport
 
   setup %{tmp_dir: root} do
     configure(root)
@@ -21,8 +21,8 @@ defmodule Jido.Workspace.Examples.OwnedReportTest do
     assert :ok = Task.Supervisor.terminate_child(owners, owner)
     assert_receive {:DOWN, ^ref, :process, ^owner, :shutdown}
 
-    assert {:error, %Workspace.Error{code: :owner_unavailable, operation: :open}} =
-             Workspace.open(profile: :memory, owner: owner)
+    assert {:error, %Host.Error{code: :owner_unavailable, operation: :open}} =
+             Host.open(profile: :memory, owner: owner)
   end
 
   test "stopping the memory owner releases the tree and preserves the saved report",
@@ -62,7 +62,7 @@ defmodule Jido.Workspace.Examples.OwnedReportTest do
     {controller, sandbox} = provider(workspace, :native)
     clean_up_docker_on_failure(sandbox)
 
-    assert {:ok, %{exit_status: 0}} = Workspace.run(workspace, ["cat", "report.txt"])
+    assert {:ok, %{exit_status: 0}} = Host.run(workspace, ["cat", "report.txt"])
     assert [_] = containers(sandbox)
 
     assert_processes_stop(controller, sandbox.pid, fn ->
@@ -87,13 +87,13 @@ defmodule Jido.Workspace.Examples.OwnedReportTest do
 
     command =
       Task.async(fn ->
-        Workspace.run(workspace, ["sleep", "45"], timeout_ms: 50_000)
+        Host.run(workspace, ["sleep", "45"], timeout_ms: 50_000)
       end)
 
     await(fn -> container_running(sandbox) end, "No running container", 10_000)
     assert_processes_stop(controller, sandbox.pid, fn -> Process.exit(controller, :kill) end)
 
-    assert {:error, %Workspace.Error{code: :closed}} = Task.await(command)
+    assert {:error, %Host.Error{code: :closed}} = Task.await(command)
     assert Process.alive?(owner)
     assert [] = containers(sandbox)
     refute File.exists?(sandbox.root)
@@ -113,24 +113,24 @@ defmodule Jido.Workspace.Examples.OwnedReportTest do
 
   defp prepare(profile, owner) do
     assert {:ok, workspace, snapshot} = OwnedReport.prepare(profile, owner, "Saved")
-    assert {:ok, %{owner: ^owner}} = Workspace.info(workspace)
-    assert :ok = Workspace.write(workspace, "report.txt", "Unsaved edit")
+    assert {:ok, %{owner: ^owner}} = Host.info(workspace)
+    assert :ok = Host.write(workspace, "report.txt", "Unsaved edit")
     {workspace, snapshot}
   end
 
   defp assert_recovery(workspace, profile, snapshot) do
-    assert {:error, %Workspace.Error{code: :closed}} = Workspace.read(workspace, "report.txt")
+    assert {:error, %Host.Error{code: :closed}} = Host.read(workspace, "report.txt")
 
-    assert {:error, %Workspace.Error{code: :closed}} =
-             Workspace.write(workspace, "report.txt", "X")
+    assert {:error, %Host.Error{code: :closed}} =
+             Host.write(workspace, "report.txt", "X")
 
-    assert {:error, %Workspace.Error{code: :closed}} = Workspace.save(workspace)
-    assert {:ok, reopened} = Workspace.open(profile: profile, from: snapshot)
+    assert {:error, %Host.Error{code: :closed}} = Host.save(workspace)
+    assert {:ok, reopened} = Host.open(profile: profile, from: snapshot)
 
     try do
-      assert {:ok, "Saved"} = Workspace.read(reopened, "report.txt")
+      assert {:ok, "Saved"} = Host.read(reopened, "report.txt")
     after
-      assert :ok = Workspace.close(reopened)
+      assert :ok = Host.close(reopened)
     end
   end
 

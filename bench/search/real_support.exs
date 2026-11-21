@@ -1,6 +1,6 @@
 defmodule SearchSpike.RealCorpus do
   @moduledoc false
-  alias Jido.Workspace
+  alias Jido.Realm.Host
 
   def freeze(source, destination) do
     walk(source, destination, "") |> Enum.sort_by(& &1.path)
@@ -45,13 +45,13 @@ defmodule SearchSpike.RealCorpus do
     |> Enum.sort_by(&{length(Path.split(&1)), &1})
     |> Enum.each(fn directory ->
       # VFS creates ancestor directories when needed.
-      if directory != ".", do: match_ok!(Workspace.mkdir(workspace, "/" <> directory))
+      if directory != ".", do: match_ok!(Host.mkdir(workspace, "/" <> directory))
     end)
 
     Enum.each(manifest, fn item ->
       data = File.read!(Path.join(root, item.path))
       if hash(data) != item.sha256, do: raise("Corpus changed during load")
-      match_ok!(Workspace.write(workspace, "/" <> item.path, data))
+      match_ok!(Host.write(workspace, "/" <> item.path, data))
     end)
   end
 

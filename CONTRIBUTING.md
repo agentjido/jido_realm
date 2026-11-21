@@ -1,6 +1,6 @@
-# Contributing to Jido Workspace
+# Contributing to Jido Realm
 
-Thank you for your interest in contributing to Jido Workspace!
+Thank you for your interest in contributing to Jido Realm!
 
 ## Development Setup
 

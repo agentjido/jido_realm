@@ -1,22 +1,22 @@
 Code.require_file("../../05_lifecycle/support.exs", __DIR__)
 
-defmodule Jido.Workspace.Examples.SaveScratchTreeTest do
+defmodule Jido.Realm.Host.Examples.SaveScratchTreeTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag :tmp_dir
 
-  alias Jido.Workspace
-  alias Jido.Workspace.Error
-  alias Jido.Workspace.Examples.LifecycleSupport
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.Error
+  alias Jido.Realm.Host.Examples.LifecycleSupport
 
   setup %{tmp_dir: root} do
     store = Path.join(root, "snapshots")
     LifecycleSupport.configure(store)
-    %{memory: memory, docker: docker} = Application.fetch_env!(:jido_workspace, :profiles)
+    %{memory: memory, docker: docker} = Application.fetch_env!(:jido_realm, :profiles)
     scratch = %{memory | policy: [:read, :write, :save]}
     review = %{memory | policy: :read_only}
 
-    Application.put_env(:jido_workspace, :profiles, %{
+    Application.put_env(:jido_realm, :profiles, %{
       scratch: scratch,
       review: review,
       docker_review: %{docker | policy: :read_only},
@@ -24,7 +24,7 @@ defmodule Jido.Workspace.Examples.SaveScratchTreeTest do
       probe: %{scratch | store: "probe"}
     })
 
-    Application.put_env(:jido_workspace, :stores, %{
+    Application.put_env(:jido_realm, :stores, %{
       "reports" => store,
       "other" => store,
       "probe" => Path.join(root, "probe")
@@ -38,10 +38,10 @@ defmodule Jido.Workspace.Examples.SaveScratchTreeTest do
   } do
     {:ok, snapshot} =
       in_workspace(:scratch, fn workspace ->
-        assert :ok = Workspace.write(workspace, "report.txt", "candidate\n")
-        assert {:ok, snapshot} = Workspace.save(workspace)
-        assert {:ok, ^snapshot} = Workspace.save(workspace)
-        assert :ok = Workspace.write(workspace, "report.txt", "unsaved edit\n")
+        assert :ok = Host.write(workspace, "report.txt", "candidate\n")
+        assert {:ok, snapshot} = Host.save(workspace)
+        assert {:ok, ^snapshot} = Host.save(workspace)
+        assert :ok = Host.write(workspace, "report.txt", "unsaved edit\n")
         {:ok, snapshot}
       end)
 
@@ -49,17 +49,17 @@ defmodule Jido.Workspace.Examples.SaveScratchTreeTest do
     assert [snapshot.digest] == File.ls!(store)
 
     in_workspace(:review, [from: reference], fn reviewer ->
-      assert {:ok, "candidate\n"} = Workspace.read(reviewer, "report.txt")
+      assert {:ok, "candidate\n"} = Host.read(reviewer, "report.txt")
 
       assert {:error, %Error{code: :policy_denied, details: %{action: :write}}} =
-               Workspace.write(reviewer, "report.txt", "overwrite\n")
+               Host.write(reviewer, "report.txt", "overwrite\n")
 
       assert {:error, %Error{code: :policy_denied, details: %{action: :save}}} =
-               Workspace.save(reviewer)
+               Host.save(reviewer)
     end)
 
     assert {:error, %Error{code: :policy_denied, details: %{action: :import}}} =
-             Workspace.open(profile: :other, from: reference)
+             Host.open(profile: :other, from: reference)
   end
 
   test "failed publication leaves the earlier snapshot and a live workspace for retry", %{
@@ -69,25 +69,25 @@ defmodule Jido.Workspace.Examples.SaveScratchTreeTest do
     assert {:ok, %{digest: next_digest}} = save_report(:probe, "next candidate\n")
 
     in_workspace(:scratch, fn workspace ->
-      assert :ok = Workspace.write(workspace, "report.txt", "earlier candidate\n")
-      assert {:ok, earlier} = Workspace.save(workspace)
-      assert :ok = Workspace.write(workspace, "report.txt", "next candidate\n")
+      assert :ok = Host.write(workspace, "report.txt", "earlier candidate\n")
+      assert {:ok, earlier} = Host.save(workspace)
+      assert :ok = Host.write(workspace, "report.txt", "next candidate\n")
       blocked_path = Path.join(store, next_digest)
       File.mkdir!(blocked_path)
 
       assert {:error, %Error{operation: :save, code: :snapshot_store_unavailable}} =
-               Workspace.save(workspace)
+               Host.save(workspace)
 
       assert Enum.sort(File.ls!(store)) == Enum.sort([earlier.digest, next_digest])
-      assert {:ok, %{phase: :ready}} = Workspace.info(workspace)
-      assert {:ok, "next candidate\n"} = Workspace.read(workspace, "report.txt")
+      assert {:ok, %{phase: :ready}} = Host.info(workspace)
+      assert {:ok, "next candidate\n"} = Host.read(workspace, "report.txt")
 
       assert {:error, %Error{code: :invalid_snapshot}} =
-               Workspace.open(profile: :review, from: %{earlier | digest: next_digest})
+               Host.open(profile: :review, from: %{earlier | digest: next_digest})
 
       assert_report(:review, earlier, "earlier candidate\n")
       File.rmdir!(blocked_path)
-      assert {:ok, %{digest: ^next_digest} = retried} = Workspace.save(workspace)
+      assert {:ok, %{digest: ^next_digest} = retried} = Host.save(workspace)
       assert_report(:review, retried, "next candidate\n")
       assert_report(:review, earlier, "earlier candidate\n")
     end)
@@ -104,16 +104,16 @@ defmodule Jido.Workspace.Examples.SaveScratchTreeTest do
     File.ln_s!(outside, path)
 
     assert {:error, %Error{code: :invalid_snapshot}} =
-             Workspace.open(profile: :review, from: snapshot)
+             Host.open(profile: :review, from: snapshot)
 
     File.rm!(path)
-    assert {:error, %Error{code: :not_found}} = Workspace.open(profile: :review, from: snapshot)
+    assert {:error, %Error{code: :not_found}} = Host.open(profile: :review, from: snapshot)
 
     File.rmdir!(store)
     File.write!(store, "blocked store")
 
     assert {:error, %Error{code: :snapshot_store_unavailable}} =
-             Workspace.open(profile: :review, from: snapshot)
+             Host.open(profile: :review, from: snapshot)
 
     File.rm!(store)
     File.mkdir!(store)
@@ -132,24 +132,24 @@ defmodule Jido.Workspace.Examples.SaveScratchTreeTest do
 
   defp save_report(profile, content) do
     in_workspace(profile, fn workspace ->
-      assert :ok = Workspace.write(workspace, "report.txt", content)
-      Workspace.save(workspace)
+      assert :ok = Host.write(workspace, "report.txt", content)
+      Host.save(workspace)
     end)
   end
 
   defp assert_report(profile, reference, content) do
     in_workspace(profile, [from: reference], fn workspace ->
-      assert {:ok, ^content} = Workspace.read(workspace, "report.txt")
+      assert {:ok, ^content} = Host.read(workspace, "report.txt")
     end)
   end
 
   defp in_workspace(profile, options \\ [], action) do
-    assert {:ok, workspace} = Workspace.open([profile: profile] ++ options)
+    assert {:ok, workspace} = Host.open([profile: profile] ++ options)
 
     try do
       action.(workspace)
     after
-      assert :ok = Workspace.close(workspace)
+      assert :ok = Host.close(workspace)
     end
   end
 end

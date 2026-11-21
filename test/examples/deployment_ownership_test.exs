@@ -1,8 +1,8 @@
-defmodule Jido.Workspace.DeploymentOwnershipTest do
+defmodule Jido.Realm.Host.DeploymentOwnershipTest do
   use ExUnit.Case, async: false
   @moduletag :integration
-  alias Jido.Workspace.{Deploy, Sandbox}
-  alias Jido.Workspace.Deploy.{Artifact, Recipe, Snapshot}
+  alias Jido.Realm.Host.{Deploy, Sandbox}
+  alias Jido.Realm.Host.Deploy.{Artifact, Recipe, Snapshot}
 
   test "an old worker cannot change a replacement deployment after controller loss" do
     {:ok, sandbox} = Sandbox.open()

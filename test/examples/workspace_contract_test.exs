@@ -1,21 +1,21 @@
-defmodule Jido.Workspace.ContractIntegrationTest do
+defmodule Jido.Realm.Host.ContractIntegrationTest do
   use ExUnit.Case, async: false
   @moduletag :integration
   @moduletag capture_log: true
-  alias Jido.Workspace
-  alias Jido.Workspace.{Error, Execution}
-  alias Jido.Workspace.TestSupport.{ActionBoundary, Actions, BoundaryAgent, ProcessBackend}
+  alias Jido.Realm.Host
+  alias Jido.Realm.Host.{Error, Execution}
+  alias Jido.Realm.Host.TestSupport.{ActionBoundary, Actions, BoundaryAgent, ProcessBackend}
 
   setup do
     assert {:ok, _} = Application.ensure_all_started(:jido)
     start_supervised!({Jido, name: __MODULE__.Runtime})
     store = start_supervised!({Agent, fn -> %{} end})
-    {:ok, ws} = Workspace.open()
-    {:ok, restricted} = Workspace.open(policy: :read_only)
+    {:ok, ws} = Host.open()
+    {:ok, restricted} = Host.open(policy: :read_only)
 
     on_exit(fn ->
-      Workspace.close(ws)
-      Workspace.close(restricted)
+      Host.close(ws)
+      Host.close(restricted)
     end)
 
     access = %{
@@ -36,8 +36,8 @@ defmodule Jido.Workspace.ContractIntegrationTest do
   for mode <- [:direct, :action, :signal] do
     test "entries, captures, and checked replacement through #{mode}", ctx do
       mode = unquote(mode)
-      :ok = Workspace.mkdir(ctx.ws, "/empty")
-      :ok = Workspace.write(ctx.ws, "/input", "first")
+      :ok = Host.mkdir(ctx.ws, "/empty")
+      :ok = Host.write(ctx.ws, "/input", "first")
       assert {:ok, %{id: id, session: :stopped}} = call(mode, :info, %{}, ctx)
       assert id == ctx.ws.id
 
@@ -51,23 +51,23 @@ defmodule Jido.Workspace.ContractIntegrationTest do
                call(mode, :list, %{path: "/"}, ctx)
 
       {:ok, saved} = call(mode, :capture, %{}, ctx)
-      :ok = Workspace.write(ctx.ws, "/input", "second")
+      :ok = Host.write(ctx.ws, "/input", "second")
 
       assert {:error, %{code: "stale_revision", operation: "replace"}} =
                call(mode, :replace, saved, ctx)
 
-      assert {:ok, "second"} = Workspace.read(ctx.ws, "/input")
+      assert {:ok, "second"} = Host.read(ctx.ws, "/input")
       {:ok, current} = call(mode, :capture, %{}, ctx)
 
       assert {:ok, %{revision_ref: _}} =
                call(mode, :replace, %{saved | revision_ref: current.revision_ref}, ctx)
 
-      assert {:ok, "first"} = Workspace.read(ctx.ws, "/input")
+      assert {:ok, "first"} = Host.read(ctx.ws, "/input")
 
       {:ok, capture} =
         ActionBoundary.fetch(ctx.access.store, "draft", :capture, saved.capture_ref)
 
-      :ok = Workspace.close(ctx.ws)
+      :ok = Host.close(ctx.ws)
       assert {:ok, "first"} = Jido.VFS.read(capture, "input")
       assert {:error, %{code: "closed", operation: "info"}} = call(mode, :info, %{}, ctx)
       assert {:error, %{code: "closed", operation: "capture"}} = call(mode, :capture, %{}, ctx)
@@ -86,7 +86,7 @@ defmodule Jido.Workspace.ContractIntegrationTest do
       assert {:error, %{code: "stale_file_view"}} =
                call(mode, :run, Map.merge(pinned, %{command: "write /marker bad"}), ctx)
 
-      assert {:error, %Error{code: :not_found}} = Workspace.read(ctx.ws, "/marker")
+      assert {:error, %Error{code: :not_found}} = Host.read(ctx.ws, "/marker")
 
       assert {:ok, %{output: "abc", truncated: true, status: :exited}} =
                call(mode, :run, %{command: "echo abcdef", output_limit: 3}, ctx)
@@ -100,7 +100,7 @@ defmodule Jido.Workspace.ContractIntegrationTest do
       assert {:ok, %{output: "ready\n", status: :exited}} =
                call(mode, :run, %{command: "echo ready"}, ctx)
 
-      assert {:error, %Error{code: :not_found}} = Workspace.read(ctx.ws, "/late")
+      assert {:error, %Error{code: :not_found}} = Host.read(ctx.ws, "/late")
       assert {:ok, %{stopped: true}} = call(mode, :stop_session, %{}, ctx)
       assert {:ok, %{stopped: true}} = call(mode, :stop_session, %{}, ctx)
       assert {:ok, %{session: :stopped}} = call(mode, :info, %{}, ctx)
@@ -132,12 +132,12 @@ defmodule Jido.Workspace.ContractIntegrationTest do
       assert {:error, %{code: "invalid_input"}} =
                call(mode, :run, %{command: "pwd", timeout_ms: 0}, ctx)
 
-      assert {:error, %Error{code: :not_found}} = Workspace.read(ctx.restricted, "/blocked")
+      assert {:error, %Error{code: :not_found}} = Host.read(ctx.restricted, "/blocked")
       refute_receive {:signal, _}
     end
 
     test "nonzero process exit retains output through #{mode}", ctx do
-      {:ok, _} = Workspace.start_session(ctx.ws, backend: {ProcessBackend, %{}})
+      {:ok, _} = Host.start_session(ctx.ws, backend: {ProcessBackend, %{}})
 
       assert {:ok, %{status: :exited, exit_status: 7, output: "before\nafter\n"}} =
                call(
@@ -151,7 +151,7 @@ defmodule Jido.Workspace.ContractIntegrationTest do
     end
 
     test "a final observation error retains completed execution through #{mode}", ctx do
-      {:ok, session} = Workspace.shell(ctx.ws)
+      {:ok, session} = Host.shell(ctx.ws)
       parent = self()
 
       observer =
@@ -182,7 +182,7 @@ defmodule Jido.Workspace.ContractIntegrationTest do
     end
 
     test "explicit cancellation retains partial output through #{mode}", ctx do
-      {:ok, session} = Workspace.shell(ctx.ws)
+      {:ok, session} = Host.shell(ctx.ws)
       parent = self()
 
       observer =
@@ -216,15 +216,15 @@ defmodule Jido.Workspace.ContractIntegrationTest do
     result =
       case operation do
         :info ->
-          with {:ok, info} <- Workspace.info(ctx.ws),
+          with {:ok, info} <- Host.info(ctx.ws),
                do: {:ok, Map.take(info, [:id, :policy, :session])}
 
         :list ->
-          with {:ok, entries} <- Workspace.list(ctx.ws, params.path),
+          with {:ok, entries} <- Host.list(ctx.ws, params.path),
                do: {:ok, %{entries: Enum.map(entries, &Map.from_struct/1)}}
 
         :capture ->
-          with {:ok, capture, revision} <- Workspace.capture(ctx.ws),
+          with {:ok, capture, revision} <- Host.capture(ctx.ws),
                do:
                  {:ok,
                   %{
@@ -237,11 +237,11 @@ defmodule Jido.Workspace.ContractIntegrationTest do
                  ActionBoundary.fetch(store, resource, :capture, params.capture_ref),
                {:ok, revision} <-
                  ActionBoundary.fetch(store, resource, :revision, params.revision_ref),
-               {:ok, next} <- Workspace.replace(ctx.ws, capture, expected: revision),
+               {:ok, next} <- Host.replace(ctx.ws, capture, expected: revision),
                do: {:ok, %{revision_ref: ActionBoundary.put(store, resource, :revision, next)}}
 
         :file_view ->
-          with {:ok, view} <- Workspace.file_view(ctx.ws),
+          with {:ok, view} <- Host.file_view(ctx.ws),
                do: {:ok, %{file_view_ref: ActionBoundary.put(store, resource, :file_view, view)}}
 
         :run ->
@@ -252,7 +252,7 @@ defmodule Jido.Workspace.ContractIntegrationTest do
 
           with {:ok, view} <- expected,
                {:ok, %Execution{} = record} <-
-                 Workspace.run(ctx.ws, params.command,
+                 Host.run(ctx.ws, params.command,
                    files: view,
                    timeout_ms: Map.get(params, :timeout_ms, 30_000),
                    output_limit: Map.get(params, :output_limit, 1_048_576)
@@ -260,19 +260,19 @@ defmodule Jido.Workspace.ContractIntegrationTest do
                do: {:ok, ActionBoundary.execution_data(record, store, resource, view)}
 
         :start_session ->
-          with {:ok, session} <- Workspace.start_session(ctx.ws),
+          with {:ok, session} <- Host.start_session(ctx.ws),
                do: {:ok, %{session_ref: ActionBoundary.put(store, resource, :session, session)}}
 
         :shell ->
-          with {:ok, session} <- Workspace.shell(ctx.ws),
+          with {:ok, session} <- Host.shell(ctx.ws),
                do: {:ok, %{session_ref: ActionBoundary.put(store, resource, :session, session)}}
 
         :filesystem ->
-          with {:ok, fs} <- Workspace.filesystem(ctx.ws),
+          with {:ok, fs} <- Host.filesystem(ctx.ws),
                do: {:ok, %{filesystem_ref: ActionBoundary.put(store, resource, :filesystem, fs)}}
 
         :stop_session ->
-          with :ok <- Workspace.stop_session(ctx.ws), do: {:ok, %{stopped: true}}
+          with :ok <- Host.stop_session(ctx.ws), do: {:ok, %{stopped: true}}
       end
 
     normalize(result)
@@ -292,7 +292,7 @@ defmodule Jido.Workspace.ContractIntegrationTest do
 
   defp call(:signal, operation, params, ctx) do
     params = parameters(params, ctx)
-    prefix = "jido.workspace.v1.workspace.#{operation}"
+    prefix = "realm.host.v1.#{operation}"
     request = Jido.Signal.new!(prefix <> ".requested", params, source: "/workspace/contract-test")
 
     assert {:ok, turn} =

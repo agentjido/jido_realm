@@ -12,26 +12,26 @@ permission. The review profile can import from the same store and read
 the restored tree.
 
 ```elixir
-alias Jido.Workspace
+alias Jido.Realm.Host
 
 root = System.fetch_env!("WORKSPACE_RESULTS_DIR")
-Application.put_env(:jido_workspace, :stores, %{"reports" => Path.join(root, "snapshots")})
+Application.put_env(:jido_realm, :stores, %{"reports" => Path.join(root, "snapshots")})
 
-Application.put_env(:jido_workspace, :profiles, %{
+Application.put_env(:jido_realm, :profiles, %{
   scratch: %{provider: :memory, policy: [:read, :write, :save], store: "reports"},
   review: %{provider: :memory, policy: :read_only, store: "reports"}
 })
 
-{:ok, scratch} = Workspace.open(profile: :scratch)
+{:ok, scratch} = Host.open(profile: :scratch)
 
 candidate =
   try do
-    :ok = Workspace.write(scratch, "report.txt", "Quarterly report\n")
-    {:ok, candidate} = Workspace.save(scratch)
-    {:ok, ^candidate} = Workspace.save(scratch)
+    :ok = Host.write(scratch, "report.txt", "Quarterly report\n")
+    {:ok, candidate} = Host.save(scratch)
+    {:ok, ^candidate} = Host.save(scratch)
     candidate
   after
-    :ok = Workspace.close(scratch)
+    :ok = Host.close(scratch)
   end
 ```
 
@@ -45,19 +45,19 @@ The host can record its JSON reference after approval. The bundle stays in
 the store.
 
 ```elixir
-{:ok, review} = Workspace.open(profile: :review, from: candidate)
+{:ok, review} = Host.open(profile: :review, from: candidate)
 
 approved_reference =
   try do
-    {:ok, "Quarterly report\n"} = Workspace.read(review, "report.txt")
+    {:ok, "Quarterly report\n"} = Host.read(review, "report.txt")
     Jason.encode!(candidate)
   after
-    :ok = Workspace.close(review)
+    :ok = Host.close(review)
   end
 ```
 
 To restore later, decode the reference and use
-`Workspace.open(profile: :review, from: Jason.decode!(approved_reference))`.
+`Host.open(profile: :review, from: Jason.decode!(approved_reference))`.
 For the separate BEAM startup workflow, see
 [00.04 Restore in a fresh BEAM](../../00_core/00_04_restore_in_a_fresh_beam/README.md).
 
