@@ -1,10 +1,5 @@
 # Jido Realm
 
-> [!IMPORTANT]
-> **This repository was previously named `jido_workspace`.** [Jido Realm](https://github.com/agentjido/jido_realm) is the successor for agent environments.
->
-> Check the provider capabilities you need for files, execution, and retention before migrating an existing Workspace integration.
-
 Jido Realm gives an agent a place to work. The host binds a file backend when
 it starts the agent. The agent uses the same file Signals for each binding.
 
