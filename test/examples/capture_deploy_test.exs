@@ -50,6 +50,9 @@ defmodule Jido.Realm.Host.Deploy.CaptureDeployTest do
     assert {:ok, %{status: :recovery_required} = failed} = Deploy.await(session, failed_id)
     assert failed.snapshot_id == changed.id
     assert failed.digest == changed.digest
+    assert %{phase: :verify, reason: reason} = failed.evidence
+    assert {:error, {:command_failed, _, {:ok, %{exit_status: 7, output: output}}}} = reason
+    assert output =~ ~s("version":2)
     assert NodeApp.get(port) =~ ~s("version":2)
     assert {:ok, %{controller: %{blocked: true}}} = Deploy.inspect(session)
     {:ok, ordinary} = Deploy.prepare(session, a, recipe: recipe)

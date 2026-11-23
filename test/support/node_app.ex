@@ -14,23 +14,25 @@ defmodule Jido.Realm.Host.Deploy.Test.NodeApp do
     server.listen(Number(process.argv[2]), '127.0.0.1');
     """
 
-    verify =
-      if Keyword.get(opts, :bad_verify, false) do
-        "process.exit(7);"
-      else
-        """
-        (async () => {
-          for (let n = 0; n < 100; n++) {
-            try {
-              const data = await (await fetch('http://127.0.0.1:' + process.argv[2])).json();
-              if (data.version === #{version}) { console.log(JSON.stringify(data)); return; }
-            } catch (_) {}
-            await new Promise(resolve => setTimeout(resolve, 20));
+    # Wait for the expected version before reporting a planned verification failure.
+    exit_status = if Keyword.get(opts, :bad_verify, false), do: 7, else: 0
+
+    verify = """
+    (async () => {
+      for (let n = 0; n < 100; n++) {
+        try {
+          const data = await (await fetch('http://127.0.0.1:' + process.argv[2])).json();
+          if (data.version === #{version}) {
+            console.log(JSON.stringify(data));
+            process.exitCode = #{exit_status};
+            return;
           }
-          process.exit(1);
-        })();
-        """
-      end
+        } catch (_) {}
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      process.exit(1);
+    })();
+    """
 
     {:ok, snapshot} =
       Snapshot.new(
