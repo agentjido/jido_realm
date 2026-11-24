@@ -4,6 +4,8 @@ defmodule Jido.Realm.WorkspaceContractTest do
   alias Jido.Plugin.Context.Admission
   alias Jido.Realm
   alias Jido.Realm.{Artifacts, Files, Local, Memory, Plugin, WorkspaceAction}
+  alias Jido.Realm.Conformance.AgentJobs.Work
+  alias Jido.Realm.Conformance.Files, as: FileContract
 
   test "file-only bindings reject managed operations and can still run file actions" do
     context = context(%{bindings: %{"work" => %{target: {Memory, nil}, grants: :all}}})
@@ -61,6 +63,46 @@ defmodule Jido.Realm.WorkspaceContractTest do
 
     assert {:error, {:invalid_realm_binding, :work, :invalid_artifact_presenter}} =
              Plugin.admit(nil, named, bindings: %{work: [root: "/example", presenter: true]})
+  end
+
+  @tag :tmp_dir
+  test "agent startup validates file grants before a file action runs", %{tmp_dir: dir} do
+    start_supervised!({Jido, name: __MODULE__})
+    memory = start_supervised!(Memory)
+
+    assert {:error, {:invalid_realm_binding, :work, {:invalid_realm_grant, :create}}} =
+             Jido.start_agent(__MODULE__, Work,
+               id: "invalid-named-grants",
+               plugin_runtime_options: [
+                 {Plugin,
+                  bindings: %{work: [backend: {Memory, memory}, grants: [:read, :create]]}}
+               ]
+             )
+
+    assert {:error, {:invalid_realm_grant, :edit}} =
+             Jido.start_agent(__MODULE__, FileContract.FileAgent,
+               id: "invalid-unnamed-grants",
+               plugin_runtime_options: [{Plugin, root: dir, grants: [:edit]}]
+             )
+
+    for grants <- [:all, [:read, :write, :publish], MapSet.new([:read, :write])] do
+      path = "note-#{System.unique_integer([:positive])}"
+
+      assert {:ok, agent} =
+               Jido.start_agent(__MODULE__, FileContract.FileAgent,
+                 id: path,
+                 plugin_runtime_options: [{Plugin, root: dir, grants: grants}]
+               )
+
+      assert :ok = Jido.AgentServer.await_ready(agent)
+      FileContract.assert_reply(agent, :create, path, %{content: "hello"})
+      FileContract.assert_reply(agent, :read, path, %{}, %{content: "hello"})
+    end
+
+    assert :ok =
+             Plugin.validate_options(
+               bindings: %{work: [session: self(), grants: [:read, :create]]}
+             )
   end
 
   @tag :tmp_dir
