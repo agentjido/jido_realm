@@ -227,7 +227,26 @@ defmodule Jido.Realm do
     end
   end
 
-  @doc "Performs a file operation against a Realm bound to the current Jido action."
+  @doc """
+  Performs a file operation against a Realm bound to the current Jido action.
+
+  On success, `:create` and `:read` return `{:ok, result}`. Both result maps
+  contain `:operation` and `:path`. The read result also contains the file text
+  in `:content`.
+
+  This example uses the action's `context` and a new path in a `:work` Realm
+  with read and write access.
+
+      path = "note.txt"
+      {:ok, %{operation: :create, path: ^path}} =
+        Jido.Realm.file(context, :work, :create, path, "hello")
+
+      {:ok, %{operation: :read, path: ^path, content: text}} =
+        Jido.Realm.file(context, :work, :read, path)
+
+  For a host workspace handle, see `Jido.Realm.Host.write/3` and
+  `Jido.Realm.Host.read/2`. They return `:ok` and `{:ok, bytes}`, respectively.
+  """
   def file(context, realm, operation, path, input \\ nil) do
     with {:ok, binding} <- binding(context, realm),
          :ok <- authorize(binding, operation),

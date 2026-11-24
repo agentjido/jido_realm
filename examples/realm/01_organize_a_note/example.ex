@@ -18,8 +18,10 @@ defmodule Jido.Realm.Examples.OrganizeNote do
 
     @impl true
     def run(%{realm: realm, from: from, to: to, text: text}, context) do
-      with {:ok, _} <- Realm.file(context, realm, :create, from, text),
-           {:ok, %{content: draft}} <- Realm.file(context, realm, :read, from),
+      with {:ok, %{operation: :create, path: ^from}} <-
+             Realm.file(context, realm, :create, from, text),
+           {:ok, %{operation: :read, path: ^from, content: draft}} <-
+             Realm.file(context, realm, :read, from),
            {:ok, _} <- Realm.file(context, realm, :create, to, draft),
            {:ok, _} <- Realm.file(context, realm, :delete, from),
            {:ok, reply} <-
