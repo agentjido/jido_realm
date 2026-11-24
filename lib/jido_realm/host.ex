@@ -119,7 +119,12 @@ defmodule Jido.Realm.Host do
   @spec stop_session(t()) :: mutation_result()
   def stop_session(ws), do: call(ws, :stop_session, :stop_session)
 
-  @doc "Reads file bytes."
+  @doc """
+  Reads file bytes and returns `{:ok, bytes}` on success.
+
+  See `write/3` for an example. In an agent action, `Jido.Realm.file/4`
+  with `:read` returns a result map with the text in `:content`.
+  """
   @spec read(t(), String.t()) :: {:ok, binary()} | {:error, Error.t()}
   def read(ws, path), do: file(ws, path, :read, :read_file, [])
 
@@ -139,9 +144,24 @@ defmodule Jido.Realm.Host do
   def read(ws, _, _), do: error(:read, ws.id, :invalid_input)
 
   @doc """
-  Writes iodata to a file. A profiled workspace creates missing parent
-  directories and replaces the specified entry. Native replacements
-  preserve the file mode and leave other hard-link entries unchanged.
+  Writes iodata to a file and returns `:ok` on success. A profiled workspace
+  creates missing parent directories and replaces the specified entry.
+  Native replacements preserve the file mode and leave other hard-link
+  entries unchanged.
+
+      alias Jido.Realm.Host
+
+      {:ok, workspace} = Host.open()
+
+      try do
+        :ok = Host.write(workspace, "/note.txt", "hello")
+        {:ok, "hello"} = Host.read(workspace, "/note.txt")
+      after
+        Host.close(workspace)
+      end
+
+  In an agent action, `Jido.Realm.file/5` with `:create` returns a result
+  map with the operation and path.
   """
   @spec write(t(), String.t(), iodata()) :: mutation_result()
   def write(ws, path, content) do
