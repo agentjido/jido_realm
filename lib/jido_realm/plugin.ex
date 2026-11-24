@@ -11,6 +11,10 @@ defmodule Jido.Realm.Plugin do
   Supply `bindings: %{work: [root: directory]}` in `plugin_runtime_options`
   when starting the agent. For an agent with a single unnamed Realm, supply
   `root: directory` or `backend: {module, handle}` directly.
+
+  File-only bindings accept `grants: :all` (the default) or a list of
+  `:read`, `:write`, and `:publish` grants. Use `:write` to allow file
+  operations such as `:create`.
   """
 
   alias Jido.Agent.Schema
@@ -37,7 +41,9 @@ defmodule Jido.Realm.Plugin do
   use Jido.Plugin,
     id: "jido.realm",
     sections: [@realms],
-    option_keys: [agent: [:realms], agent_server: [:root, :backend, :bindings]]
+    option_keys: [agent: [:realms], agent_server: [:root, :backend, :bindings, :grants]]
+
+  @file_grants [:read, :write, :publish]
 
   @operations %{
     "realm.file.create" => :create,
@@ -119,6 +125,43 @@ defmodule Jido.Realm.Plugin do
 
   @impl Jido.Plugin
   def prepare(_context, opts), do: {:ok, Keyword.get(opts, :realms, [])}
+
+  @impl Jido.Plugin
+  def validate_options(opts) do
+    case Keyword.get(opts, :bindings) do
+      bindings when is_map(bindings) ->
+        Enum.reduce_while(bindings, :ok, fn {name, options}, :ok ->
+          case validate_file_grants(options) do
+            :ok -> {:cont, :ok}
+            {:error, reason} -> {:halt, {:error, {:invalid_realm_binding, name, reason}}}
+          end
+        end)
+
+      _ ->
+        validate_file_grants(opts)
+    end
+  end
+
+  defp validate_file_grants(opts) do
+    with true <- Keyword.keyword?(opts),
+         [{kind, _}] when kind in [:root, :backend] <-
+           Keyword.take(opts, [:root, :backend, :session]) do
+      validate_grants(Keyword.get(opts, :grants, :all))
+    else
+      _ -> :ok
+    end
+  end
+
+  defp validate_grants(:all), do: :ok
+
+  defp validate_grants(grants) when is_list(grants) or is_struct(grants, MapSet) do
+    Enum.reduce_while(grants, :ok, fn
+      grant, :ok when grant in @file_grants -> {:cont, :ok}
+      grant, :ok -> {:halt, {:error, {:invalid_realm_grant, grant}}}
+    end)
+  end
+
+  defp validate_grants(_), do: {:error, :invalid_realm_grants}
 
   @impl Jido.Plugin
   def admit(_runtime, %Admission{prepared_input: [], signal: %{type: type}}, opts)
